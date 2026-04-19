@@ -11,8 +11,8 @@ COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 
 RUN groupadd -r swarmpit && \
     useradd -r -g swarmpit -d /usr/src/app -s /sbin/nologin swarmpit && \
-    mkdir -p /usr/src/app /tmp/swarmpit && \
-    chown -R swarmpit:swarmpit /usr/src/app /tmp/swarmpit
+    mkdir -p /usr/src/app /tmp/swarmpit /data && \
+    chown -R swarmpit:swarmpit /usr/src/app /tmp/swarmpit /data
 
 WORKDIR /usr/src/app
 COPY --chown=swarmpit:swarmpit target/swarmpit.jar .

@@ -51,7 +51,7 @@
 (def cache (atom (cache/basic-cache-factory {})))
 
 (defn influx-configured? []
-  (some? (config :influxdb-url)))
+  true)
 
 (defn ready? []
   (some? (and (not-empty @cache)

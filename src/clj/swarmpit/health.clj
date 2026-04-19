@@ -2,8 +2,6 @@
   "Liveness and readiness probes"
   (:require [swarmpit.couchdb.client :as cc]
             [swarmpit.docker.engine.client :as dc]
-            [swarmpit.influxdb.client :as ic]
-            [swarmpit.config :refer [config]]
             [swarmpit.resilience :as res]))
 
 (defn- check [f]
@@ -18,16 +16,12 @@
 (defn ready
   "Readiness probe — are critical dependencies reachable?"
   [_]
-  (let [couch-ok  (check #(cc/version))
+  (let [db-ok     (check #(cc/version))
         docker-ok (check #(dc/ping))
-        influx-ok (or (nil? (config :influxdb-url))
-                      (check #(ic/ping)))
-        all-ok    (and couch-ok docker-ok)]
+        all-ok    (and db-ok docker-ok)]
     {:status (if all-ok 200 503)
      :body   {:status     (if all-ok "UP" "DOWN")
-              :components {:couchdb  (if couch-ok "UP" "DOWN")
+              :components {:sqlite   (if db-ok "UP" "DOWN")
                            :docker   (if docker-ok "UP" "DOWN")
-                           :influxdb (if influx-ok "UP" "DOWN")
-                           :circuits {:docker  (name ((:status res/docker-cb)))
-                                      :couchdb (name ((:status res/couch-cb)))
-                                      :influx  (name ((:status res/influx-cb)))}}}}))
+                           :circuits {:docker (name ((:status res/docker-cb)))}
+                           :stats    "in-memory"}}}))
