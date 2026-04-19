@@ -4,14 +4,11 @@
             [taoensso.encore :as enc]
             [taoensso.timbre :refer [error debug]]
             [swarmpit.log :refer [pretty-print pretty-print-ex]])
-  (:import (java.util.concurrent TimeoutException ExecutionException
-                                 Executors TimeUnit)
+  (:import (java.util.concurrent TimeoutException ExecutionException)
            (java.io IOException)
            (clojure.lang ExceptionInfo)))
 
 (def default-timeout 15000)
-
-(def ^:private vt-executor (Executors/newVirtualThreadPerTaskExecutor))
 
 (def ^:private req-func
   {:HEAD   http/head
@@ -27,16 +24,15 @@
            {:body (generate-string (:body options))})))
 
 (defn- with-timeout
-  "Execute f on a virtual thread with timeout"
+  "Execute f with timeout using future+deref"
   [ms f]
-  (let [future (.submit vt-executor ^Callable (fn [] (f)))]
-    (try
-      (.get future ms TimeUnit/MILLISECONDS)
-      (catch java.util.concurrent.TimeoutException _
-        (.cancel future true)
-        (throw (TimeoutException.)))
-      (catch ExecutionException e
-        (throw (.getCause e))))))
+  (let [fut (future (f))
+        v (gensym)
+        result (deref fut ms v)]
+    (if (= v result)
+      (do (future-cancel fut)
+          (throw (TimeoutException.)))
+      result)))
 
 (defn- error-response
   [response-data error-handler]
