@@ -22,15 +22,10 @@ LABEL org.opencontainers.image.description="Hardened Docker Swarm management UI"
 
 COPY --from=docker:27.5-cli /usr/local/bin/docker /usr/local/bin/docker
 
-RUN groupadd -r swarmpit && \
-    useradd -r -g swarmpit -d /app -s /sbin/nologin swarmpit && \
-    mkdir -p /app /data /tmp/swarmpit && \
-    chown -R swarmpit:swarmpit /app /data /tmp/swarmpit
+RUN mkdir -p /app /data /tmp/swarmpit
 
 WORKDIR /app
-COPY --from=builder --chown=swarmpit:swarmpit /build/target/swarmpit.jar .
-
-USER swarmpit
+COPY --from=builder /build/target/swarmpit.jar .
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
   CMD java -cp swarmpit.jar clojure.main -e '(System/exit 0)' || exit 1
