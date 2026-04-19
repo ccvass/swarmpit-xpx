@@ -17,7 +17,9 @@
     (str dir "/swarmpit.db")))
 
 (def ^:private ds
-  (delay (jdbc/get-datasource {:dbtype "sqlite" :dbname (db-path)})))
+  (delay
+    (let [path (db-path)]
+      (jdbc/get-datasource {:dbtype "sqlite" :dbname path}))))
 
 (defn- conn [] @ds)
 
