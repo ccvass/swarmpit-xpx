@@ -32,7 +32,7 @@
                  [enlive "1.1.6"]
                  [expound "0.7.2"]
                  [clj-time "0.15.2"]
-                 [clj-http "3.10.1"]
+                 [clj-http "3.12.3"]
                  [clj-commons/clj-yaml "0.7.1"]
                  [cljs-ajax "0.8.0"]
                  [cheshire "5.13.0"]

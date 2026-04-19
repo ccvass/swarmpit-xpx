@@ -4,7 +4,7 @@
             [swarmpit.docker.engine.client :as dc]
             [taoensso.timbre :as timbre :refer [info warn]]))
 
-(def ^:private supported-max "1.44")
+(def ^:private supported-max "1.47")
 
 (defn- parse-api
   [s]
