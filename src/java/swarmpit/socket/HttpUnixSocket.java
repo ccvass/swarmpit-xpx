@@ -11,23 +11,22 @@ import java.nio.file.Path;
 public class HttpUnixSocket extends Socket {
 
     private final SocketChannel channel;
-    private final Path socketPath;
-    private boolean connected = false;
+    private final boolean connected;
 
     public HttpUnixSocket(Path socketPath) throws IOException {
-        this.socketPath = socketPath;
         this.channel = SocketChannel.open(StandardProtocolFamily.UNIX);
+        this.channel.connect(UnixDomainSocketAddress.of(socketPath));
+        this.connected = true;
     }
 
     @Override
     public void connect(SocketAddress endpoint, int timeout) throws IOException {
-        channel.connect(UnixDomainSocketAddress.of(socketPath));
-        connected = true;
+        // Already connected in constructor
     }
 
     @Override
     public void connect(SocketAddress endpoint) throws IOException {
-        connect(endpoint, 0);
+        // Already connected in constructor
     }
 
     @Override
@@ -65,7 +64,6 @@ public class HttpUnixSocket extends Socket {
         channel.shutdownOutput();
     }
 
-    // No-ops for Unix sockets
     @Override public void setTcpNoDelay(boolean on) {}
     @Override public boolean getTcpNoDelay() { return false; }
     @Override public void setSoLinger(boolean on, int linger) {}
@@ -79,6 +77,6 @@ public class HttpUnixSocket extends Socket {
 
     @Override
     public String toString() {
-        return "HttpUnixSocket[" + socketPath + "]";
+        return "HttpUnixSocket[connected=" + connected + "]";
     }
 }
