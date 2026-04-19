@@ -32,12 +32,14 @@
   [^Exception e _]
   (let [response (ex-data e)]
     (case (:type response)
-      :http-client (dissoc response :headers)
-      :aws-client response
-      :docker-cli response
+      :http-client (-> response (dissoc :headers) (update :body select-keys [:error]))
+      :aws-client (select-keys response [:status :body])
+      :docker-cli (select-keys response [:status :body])
       :api response
-      {:status 500
-       :body   (Throwable->map e)})))
+      (do
+        (taoensso.timbre/error e "Unhandled exception in request handler")
+        {:status 500
+         :body   {:error "Internal server error"}}))))
 
 (def app-middleware
   [;; negotiation, request decoding and response encoding
