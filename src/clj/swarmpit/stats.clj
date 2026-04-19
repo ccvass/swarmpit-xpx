@@ -21,11 +21,12 @@
 (defn host-cpus
   "Number of host CPUs"
   [host-id]
-  (-> (->> (nodes-memo)
-           (filter #(= host-id (:ID %)))
-           (first))
-      (get-in [:Description :Resources :NanoCPUs])
-      (nano->)))
+  (or (some-> (->> (nodes-memo)
+                   (filter #(= host-id (:ID %)))
+                   (first))
+              (get-in [:Description :Resources :NanoCPUs])
+              (nano->))
+      0))
 
 (defn cluster-cpus
   "Number of cluster CPUs"
@@ -113,17 +114,23 @@
   (let [cached-hosts (vals @cache)
         active-hosts (active-hosts)
         hosts (filter #(contains? active-hosts (:id %)) cached-hosts)
-        sum-fn (fn [ks] (reduce + (map #(get-in % ks) hosts)))
-        mean-fn (fn [ks] (/ (sum-fn ks) (count hosts)))]
-    {:resources (hosts-resources)
-     :cpu       {:usage (mean-fn [:cpu :usedPercentage])
-                 :cores (cluster-cpus)}
-     :memory    {:usage (mean-fn [:memory :usedPercentage])
-                 :used  (sum-fn [:memory :used])
-                 :total (sum-fn [:memory :total])}
-     :disk      {:usage (mean-fn [:disk :usedPercentage])
-                 :used  (sum-fn [:disk :used])
-                 :total (sum-fn [:disk :total])}}))
+        n (count hosts)]
+    (if (zero? n)
+      {:resources {}
+       :cpu       {:usage 0 :cores 0}
+       :memory    {:usage 0 :used 0 :total 0}
+       :disk      {:usage 0 :used 0 :total 0}}
+      (let [sum-fn (fn [ks] (reduce + (map #(get-in % ks) hosts)))
+            mean-fn (fn [ks] (/ (sum-fn ks) n))]
+        {:resources (hosts-resources)
+         :cpu       {:usage (mean-fn [:cpu :usedPercentage])
+                     :cores (cluster-cpus)}
+         :memory    {:usage (mean-fn [:memory :usedPercentage])
+                     :used  (sum-fn [:memory :used])
+                     :total (sum-fn [:memory :total])}
+         :disk      {:usage (mean-fn [:disk :usedPercentage])
+                     :used  (sum-fn [:disk :used])
+                     :total (sum-fn [:disk :total])}})))) 
 
 (defn task-timeseries
   "Get task timeseries data for last 24 hours"
