@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [list])
   (:require [org.httpkit.server :refer [send!]]
             [clojure.core.async :refer [go <! timeout]]
-            [clojure.core.memoize :as memo]
             [clojure.edn :as edn]
             [clojure.tools.logging :as log]
             [clojure.walk :refer [keywordize-keys]]
@@ -87,8 +86,18 @@
                    (when-not status
                      (swap! hub dissoc ch)))))))))
 
-;; To prevent data duplicity/spam we cache:
+;; To prevent data duplicity/spam we debounce:
 ;;
 ;; 1) Swarm scoped events that are received from each manager at the same time
 ;; 2) Same local scoped events that occured within 1 second
-(def broadcast-memo (memo/ttl broadcast :ttl/threshold 1000))
+(def ^:private last-broadcast (atom {}))
+
+(defn broadcast-memo
+  "Debounced broadcast — ignores duplicate events within 1 second"
+  [event]
+  (let [k (hash event)
+        now (System/currentTimeMillis)
+        prev (get @last-broadcast k 0)]
+    (when (> (- now prev) 1000)
+      (swap! last-broadcast assoc k now)
+      (broadcast event))))
