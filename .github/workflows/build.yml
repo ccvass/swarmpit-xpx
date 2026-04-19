@@ -51,11 +51,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        name: download release jar
-        with:
-          name: swarmpit.jar
-          path: target
       - name: set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: set up Docker Buildx
@@ -78,7 +73,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          target: runtime
           push: true
           platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
           tags: ghcr.io/ccvass/swarmpit-xpx:${{ steps.tag.outputs.value }}

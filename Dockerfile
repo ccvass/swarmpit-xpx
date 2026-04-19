@@ -28,10 +28,7 @@ RUN groupadd -r swarmpit && \
     chown -R swarmpit:swarmpit /app /data /tmp/swarmpit
 
 WORKDIR /app
-
-# CI: jar at target/swarmpit.jar (from artifact download)
-# Local: jar from builder stage
-COPY --chown=swarmpit:swarmpit target/swarmpit.jar .
+COPY --from=builder --chown=swarmpit:swarmpit /build/target/swarmpit.jar .
 
 USER swarmpit
 
