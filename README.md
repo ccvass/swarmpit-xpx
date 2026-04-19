@@ -1,6 +1,12 @@
 # Swarmpit XPX
 
-Hardened, self-contained Docker Swarm management UI. Zero external databases. Two containers. Done.
+<p align="center">
+  <img src="resources/public/img/logo-xpx.svg" alt="Swarmpit XPX" width="400">
+</p>
+
+<p align="center">
+  Hardened, self-contained Docker Swarm management UI. Zero external databases. Two containers. Done.
+</p>
 
 [![Test, Build & Deploy](https://github.com/ccvass/swarmpit-xpx/actions/workflows/build.yml/badge.svg)](https://github.com/ccvass/swarmpit-xpx/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-EPL--1.0-blue.svg)](LICENSE)
