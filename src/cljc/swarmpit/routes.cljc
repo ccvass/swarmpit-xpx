@@ -46,7 +46,8 @@
     {:name :login
      :post (array-map
              :no-doc true
-             #?@(:clj [:handler handler/login]))}]
+             #?@(:clj [:middleware [swarmpit.ratelimit/wrap-login-ratelimit]
+                        :handler handler/login]))}]
    ["/slt"
     {:name :slt
      :get  (array-map
