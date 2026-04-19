@@ -94,8 +94,8 @@
   (info "Swarmpit is starting...")
   (db/init)
   (let [port (or port 8080)]
-    (run-server app {:port port :thread -1 :queue-size 300000})
-    (info "Swarmpit running on port" port "(virtual threads enabled)"))
+    (run-server app {:port port :thread 16 :queue-size 300000})
+    (info "Swarmpit running on port" port))
   (agent/init)
   (setup/docker)
   (setup/log)
