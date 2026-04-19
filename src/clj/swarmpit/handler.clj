@@ -7,7 +7,8 @@
             [swarmpit.token :as token]
             [swarmpit.stats :as stats]
             [swarmpit.version :as version]
-            [swarmpit.ratelimit :as rl]))
+            [swarmpit.ratelimit :as rl]
+            [swarmpit.health :as health]))
 
 (defn include-css [href revision]
   (first (html/html [:link {:href (str href "?r=" revision) :rel "stylesheet"}])))
@@ -68,6 +69,11 @@
   [_]
   (->> (version/info)
        (resp-ok)))
+
+;; Health handlers
+
+(def health-live health/live)
+(def health-ready health/ready)
 
 ;; SLT handler
 

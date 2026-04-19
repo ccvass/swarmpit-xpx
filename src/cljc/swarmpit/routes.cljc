@@ -46,12 +46,12 @@
     {:name :health-live
      :get  (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.health/live]))}]
+             #?@(:clj [:handler handler/health-live]))}]
    ["/health/ready"
     {:name :health-ready
      :get  (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.health/ready]))}]
+             #?@(:clj [:handler handler/health-ready]))}]
    ["/login"
     {:name :login
      :post (array-map
