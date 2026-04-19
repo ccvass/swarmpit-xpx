@@ -8,10 +8,10 @@ RUN apt-get update && \
     chmod +x /usr/local/bin/lein && \
     lein version
 COPY project.clj ./
+COPY repo/ repo/
 RUN lein deps
 COPY src/ src/
 COPY resources/ resources/
-COPY repo/ repo/
 RUN lein with-profile prod uberjar
 
 # Stage 2: Runtime
