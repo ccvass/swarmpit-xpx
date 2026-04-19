@@ -32,12 +32,14 @@
   [^Exception e _]
   (let [response (ex-data e)]
     (case (:type response)
-      :http-client (dissoc response :headers)
-      :aws-client response
-      :docker-cli response
+      :http-client (-> response (dissoc :headers) (update :body select-keys [:error]))
+      :aws-client (select-keys response [:status :body])
+      :docker-cli (select-keys response [:status :body])
       :api response
-      {:status 500
-       :body   (Throwable->map e)})))
+      (do
+        (taoensso.timbre/error e "Unhandled exception in request handler")
+        {:status 500
+         :body   {:error "Internal server error"}}))))
 
 (def app-middleware
   [;; negotiation, request decoding and response encoding
@@ -92,8 +94,8 @@
   (info "Swarmpit is starting...")
   (db/init)
   (let [port (or port 8080)]
-    (run-server app {:port port} :thread 8 :queue-size 300000)
-    (info "Swarmpit running on port" port))
+    (run-server app {:port port :thread -1 :queue-size 300000})
+    (info "Swarmpit running on port" port "(virtual threads enabled)"))
   (agent/init)
   (setup/docker)
   (setup/log)

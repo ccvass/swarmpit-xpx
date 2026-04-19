@@ -1,17 +1,27 @@
-FROM debian:bookworm-slim
+FROM eclipse-temurin:21-jre-jammy
 
 RUN apt-get update && \
-    mkdir -p /usr/share/man/man1 && \
-    apt-get install -y ca-certificates curl openjdk-17-jre-headless libjffi-java
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      tini && \
+    rm -rf /var/lib/apt/lists/*
 
-ADD dev/script/install-docker-client.sh .
-RUN bash install-docker-client.sh
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 
-RUN mkdir -p /usr/src/app
+RUN groupadd -r swarmpit && \
+    useradd -r -g swarmpit -d /usr/src/app -s /sbin/nologin swarmpit && \
+    mkdir -p /usr/src/app /tmp/swarmpit /data && \
+    chown -R swarmpit:swarmpit /usr/src/app /tmp/swarmpit /data
+
 WORKDIR /usr/src/app
-COPY target/swarmpit.jar /usr/src/app/
+COPY --chown=swarmpit:swarmpit target/swarmpit.jar .
 
-HEALTHCHECK CMD curl --fail -s http://localhost:8080
+USER swarmpit
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl --fail -s http://localhost:8080/version || exit 1
 
 EXPOSE 8080
-CMD ["java", "-jar", "swarmpit.jar"]
+ENTRYPOINT ["tini", "--"]
+CMD ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "swarmpit.jar"]

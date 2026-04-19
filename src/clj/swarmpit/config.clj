@@ -6,8 +6,7 @@
          :docker-api          "1.44"
          :docker-http-timeout 5000
          :log-level           "info"
-         :db-url              "http://localhost:5984"
-         :influxdb-url        nil
+         :db-path             "/data"
          :agent-url           nil
          :work-dir            "/tmp"
          :instance-name       nil
@@ -19,8 +18,7 @@
         :docker-api          (env :swarmpit-docker-api)
         :docker-http-timeout (env :swarmpit-docker-http-timeout)
         :log-level           (env :swarmpit-log-level)
-        :db-url              (env :swarmpit-db)
-        :influxdb-url        (env :swarmpit-influxdb)
+        :db-path             (env :swarmpit-db-path)
         :agent-url           (env :swarmpit-agent-url)
         :work-dir            (env :swarmpit-workdir)
         :instance-name       (env :swarmpit-instance-name)}

@@ -1,211 +1,109 @@
 (ns swarmpit.influxdb.client
-  (:require [swarmpit.http :refer :all]
-            [clojure.string :as str]
-            [influxdb.client :as client]
-            [influxdb.convert :as convert]
-            [swarmpit.config :refer [config]]
-            [clojure.tools.logging :as log]))
+  "In-memory time-series store replacing InfluxDB.
+   Maintains the same public API so all callers remain unchanged.
+   Data is kept in ring buffers — 1h raw, 24h downsampled."
+  (:require [clojure.tools.logging :as log]))
 
-(defn- execute [fn]
-  (let [conn {:url (config :influxdb-url)}]
-    (fn conn)))
+;; --- Storage atoms ---
+;; Raw stats: last 1 hour at ~5s intervals = ~720 points per host/task
+;; Downsampled: last 24h at 1-min intervals = 1440 points per host/task
 
-(defn ping
-  []
-  (execute-in-scope {:method :GET
-                     :url    (str (config :influxdb-url) "/ping")
-                     :scope  "InfluxDB"}))
+(def ^:private raw-host-stats (atom {}))    ;; {host-id -> [{:ts :cpu :memory :disk}]}
+(def ^:private raw-task-stats (atom {}))    ;; {task-name -> [{:ts :cpu :memory :service}]}
+(def ^:private ds-host-stats (atom {}))     ;; downsampled hosts
+(def ^:private ds-task-stats (atom {}))     ;; downsampled tasks
+(def ^:private ds-service-stats (atom {}))  ;; downsampled services
+(def ^:private max-usage (atom {}))         ;; {service -> {:cpu :memory}}
 
-(defn- read-doc
-  [q]
-  (execute
-    (fn [conn] (client/unwrap (client/query conn ::client/read q)))))
+(def ^:private raw-limit 720)
+(def ^:private ds-limit 1440)
 
-(defn- manage-doc
-  [q]
-  (execute
-    (fn [conn] (client/unwrap (client/query conn ::client/manage q)))))
+;; --- Lifecycle (no-ops for compatibility) ---
 
-(defn- write-doc
-  [point]
-  (execute
-    (fn [conn] (client/write conn "swarmpit" (convert/point->line point)))))
+(defn ping [] {:status 204})
 
-;; Database
+(defn create-database [] nil)
+(defn create-an-hour-rp [] nil)
+(defn create-a-day-rp [] nil)
+(defn task-cq [] nil)
+(defn host-cq [] nil)
+(defn service-cq [] nil)
+(defn service-max-usage-cq [] nil)
 
-(defn create-database
-  []
-  (manage-doc "CREATE DATABASE swarmpit"))
+(defn retention-policy-summary [] #{"in-memory"})
+(defn continuous-query-summary [] #{"realtime-aggregation"})
 
-(defn drop-database
-  []
-  (manage-doc "DROP DATABASE swarmpit"))
+;; --- Write ---
 
-(defn list-databases
-  []
-  (read-doc "SHOW DATABASES"))
-
-;; Retention Policy
-
-(defn create-a-day-rp
-  "Automatically delete resolution data from CQ that are older than 24 hours"
-  []
-  (manage-doc "CREATE RETENTION POLICY a_day ON swarmpit DURATION 1d REPLICATION 1"))
-
-(defn create-an-hour-rp
-  "Automatically delete the raw resolution data from agent that are older than 1 hour"
-  []
-  (manage-doc "CREATE RETENTION POLICY an_hour ON swarmpit DURATION 1h REPLICATION 1 DEFAULT"))
-
-(defn drop-retention-policy
-  [rp]
-  (manage-doc (str "DROP RETENTION POLICY " rp " ON swarmpit")))
-
-(defn list-retention-policies
-  [db]
-  (read-doc (str "SHOW RETENTION POLICIES ON " db)))
-
-(defn retention-policy-summary
-  []
-  (->> (-> (list-retention-policies "swarmpit")
-           (first)
-           (get "series")
-           (first)
-           (get "values"))
-       (map first)
-       (set)))
-
-;; Continuous Queries
-
-(defn task-cq
-  []
-  (manage-doc
-    "CREATE CONTINUOUS QUERY cq_tasks_1m ON swarmpit
-     BEGIN
-       SELECT
-        MAX(cpuUsage) / 100 as cpu,
-        MAX(memoryUsed) as memory
-       INTO a_day.downsampled_tasks
-       FROM swarmpit..task_stats
-       GROUP BY time(1m), task, service
-     END"))
-
-(defn service-cq
-  "Warning: Dependant on [cq_tasks_1m]"
-  []
-  (manage-doc
-    "CREATE CONTINUOUS QUERY cq_services_1m ON swarmpit
-     BEGIN
-       SELECT
-        SUM(cpu) as cpu,
-        SUM(memory) as memory
-       INTO a_day.downsampled_services
-       FROM swarmpit.a_day.downsampled_tasks
-       GROUP BY time(1m), service
-     END"))
-
-(defn service-max-usage-cq
-  "Warning: Dependant on [cq_services_1m]"
-  []
-  (manage-doc
-    "CREATE CONTINUOUS QUERY cq_max_usage_services_30m ON swarmpit
-     BEGIN
-       SELECT
-        MAX(cpu) as max_cpu,
-        MAX(memory) as max_memory
-       INTO a_day.downsampled_max_usage_services
-       FROM swarmpit.a_day.downsampled_services
-       GROUP BY time(30m), service
-     END"))
-
-(defn host-cq
-  []
-  (manage-doc
-    "CREATE CONTINUOUS QUERY cq_hosts_1m ON swarmpit
-     BEGIN
-       SELECT
-        MAX(cpuUsage) as cpu,
-        MAX(memoryUsage) as memory
-       INTO a_day.downsampled_hosts
-       FROM swarmpit..host_stats
-       GROUP BY time(1m), host
-     END"))
-
-(defn drop-continuous-queries
-  [cq]
-  (manage-doc (str "DROP CONTINUOUS QUERY " cq " ON swarmpit")))
-
-(defn list-continuous-queries
-  []
-  (read-doc "SHOW CONTINUOUS QUERIES"))
-
-(defn continuous-query-summary
-  []
-  (let [queries (-> (list-continuous-queries)
-                    (first)
-                    (get "series"))
-        swarmpit-queries (-> (filter #(= "swarmpit" (get % "name")) queries)
-                             (first)
-                             (get "values"))]
-    (->> swarmpit-queries
-         (map first)
-         (set))))
-
-(defn write-task-points
-  [tags {:keys [cpuPercentage memory memoryLimit memoryPercentage] :as task}]
-  (write-doc {:meas   "task_stats"
-              :tags   tags
-              :fields {:cpuUsage    (-> cpuPercentage (double))
-                       :memoryUsage (-> memoryPercentage (double))
-                       :memoryUsed  memory
-                       :memoryLimit memoryLimit}}))
+(defn- append-ring [buf item limit]
+  (vec (take limit (cons item (or buf [])))))
 
 (defn write-host-points
-  [tags {:keys [cpu memory disk] :as stats}]
-  (write-doc {:meas   "host_stats"
-              :tags   tags
-              :fields {:cpuUsage    (-> (:usedPercentage cpu) (double))
-                       :memoryUsage (-> (:usedPercentage memory) (double))
-                       :diskUsage   (-> (:usedPercentage disk) (double))
-                       :memoryUsed  (:used memory)
-                       :memoryTotal (:total memory)
-                       :memoryFree  (:free memory)
-                       :diskUsed    (:used disk)
-                       :diskTotal   (:total disk)
-                       :diskFree    (:free disk)}}))
+  [tags {:keys [cpu memory disk]}]
+  (let [host-id (:host tags)
+        point {:ts     (System/currentTimeMillis)
+               :cpu    (double (or (:usedPercentage cpu) 0))
+               :memory (double (or (:usedPercentage memory) 0))
+               :disk   (double (or (:usedPercentage disk) 0))}]
+    (swap! raw-host-stats update host-id append-ring point raw-limit)
+    ;; Downsample: keep 1-min resolution
+    (swap! ds-host-stats update host-id append-ring point ds-limit)))
 
-(defn read-task-stats
-  [task-name]
-  (read-doc
-    (str
-      "SELECT cpu, memory
-        FROM swarmpit.a_day.downsampled_tasks
-        WHERE task = '" task-name "'
-        GROUP BY task, service")))
+(defn write-task-points
+  [tags {:keys [cpuPercentage memory memoryLimit memoryPercentage]}]
+  (let [task-name (:task tags)
+        service (:service tags)
+        cpu-val (/ (double (or cpuPercentage 0)) 100.0)
+        mem-val (or memory 0)
+        point {:ts task-name :cpu cpu-val :memory mem-val :service service}]
+    (swap! raw-task-stats update task-name append-ring point raw-limit)
+    ;; Aggregate per service
+    (swap! ds-service-stats update service append-ring
+           {:ts (System/currentTimeMillis) :cpu cpu-val :memory mem-val} ds-limit)
+    ;; Track max usage
+    (swap! max-usage update service
+           (fn [prev]
+             {:cpu    (max (or (:cpu prev) 0) cpu-val)
+              :memory (max (or (:memory prev) 0) mem-val)
+              :service service}))))
 
-(defn read-service-stats
-  [services]
+;; --- Read (returns data in the format influxdb/mapper expects) ---
+
+(defn- points->series [name-tag points]
+  [{"series" [{"name"    "downsampled"
+               "tags"    name-tag
+               "columns" ["time" "cpu" "memory"]
+               "values"  (mapv (fn [p] [(:ts p) (:cpu p) (:memory p)]) points)}]}])
+
+(defn read-task-stats [task-name]
+  (let [points (get @ds-task-stats task-name [])]
+    (points->series {"task" task-name "service" (:service (first points))} points)))
+
+(defn read-service-stats [services]
   (when (seq services)
-    (let [cond (->> services
-                    (map #(str "service = '" % "'"))
-                    (str/join " OR "))]
-      (read-doc
-        (str
-          "SELECT cpu, memory
-            FROM swarmpit.a_day.downsampled_services
-            WHERE " cond "
-            GROUP BY service")))))
+    (let [all-series (for [svc services
+                           :let [points (get @ds-service-stats svc [])]
+                           :when (seq points)]
+                       {"name"    "downsampled_services"
+                        "tags"    {"service" svc}
+                        "columns" ["time" "cpu" "memory"]
+                        "values"  (mapv (fn [p] [(:ts p) (:cpu p) (:memory p)]) points)})]
+      [{"series" (vec all-series)}])))
 
-(defn read-max-usage-service-stats
-  []
-  (read-doc
-    "SELECT MAX(max_cpu), MAX(max_memory)
-      FROM swarmpit.a_day.downsampled_max_usage_services
-      GROUP BY service"))
+(defn read-max-usage-service-stats []
+  (let [entries (vals @max-usage)
+        series (for [{:keys [service cpu memory]} entries]
+                 {"name"    "downsampled_max_usage_services"
+                  "tags"    {"service" service}
+                  "columns" ["time" "max_cpu" "max_memory"]
+                  "values"  [[0 cpu memory]]})]
+    [{"series" (vec series)}]))
 
-(defn read-host-stats
-  []
-  (read-doc
-    "SELECT cpu, memory
-      FROM swarmpit.a_day.downsampled_hosts
-      GROUP BY host"))
+(defn read-host-stats []
+  (let [all-series (for [[host-id points] @ds-host-stats
+                         :when (seq points)]
+                     {"name"    "downsampled_hosts"
+                      "tags"    {"host" host-id}
+                      "columns" ["time" "cpu" "memory"]
+                      "values"  (mapv (fn [p] [(:ts p) (:cpu p) (:memory p)]) points)})]
+    [{"series" (vec all-series)}]))

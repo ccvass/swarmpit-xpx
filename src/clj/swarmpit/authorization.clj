@@ -65,6 +65,8 @@
              :handler any-access}
             {:pattern #"^/version$"
              :handler any-access}
+            {:pattern #"^/health/.*"
+             :handler any-access}
             {:pattern #"^/initialize$"
              :handler any-access}
             {:pattern #"^/slt"

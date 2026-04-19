@@ -8,7 +8,18 @@
             [swarmpit.utils :refer [nano-> as-MiB]]
             [swarmpit.config :refer [config]]))
 
-(def nodes-memo (memo/ttl docker/nodes :ttl/threshold 5000))
+(defn- memo-ttl-safe
+  "Like memo/ttl but does not cache nil or empty collection results"
+  [f ttl-ms]
+  (let [cached (memo/ttl f :ttl/threshold ttl-ms)]
+    (fn [& args]
+      (let [result (apply cached args)]
+        (if (and (coll? result) (empty? result))
+          (do (memo/memo-clear! cached args)
+              (apply f args))
+          result)))))
+
+(def nodes-memo (memo-ttl-safe docker/nodes 5000))
 
 (defn active-hosts
   "List of running nodes"
@@ -21,11 +32,12 @@
 (defn host-cpus
   "Number of host CPUs"
   [host-id]
-  (-> (->> (nodes-memo)
-           (filter #(= host-id (:ID %)))
-           (first))
-      (get-in [:Description :Resources :NanoCPUs])
-      (nano->)))
+  (or (some-> (->> (nodes-memo)
+                   (filter #(= host-id (:ID %)))
+                   (first))
+              (get-in [:Description :Resources :NanoCPUs])
+              (nano->))
+      0))
 
 (defn cluster-cpus
   "Number of cluster CPUs"
@@ -39,7 +51,7 @@
 (def cache (atom (cache/basic-cache-factory {})))
 
 (defn influx-configured? []
-  (some? (config :influxdb-url)))
+  true)
 
 (defn ready? []
   (some? (and (not-empty @cache)
@@ -113,17 +125,23 @@
   (let [cached-hosts (vals @cache)
         active-hosts (active-hosts)
         hosts (filter #(contains? active-hosts (:id %)) cached-hosts)
-        sum-fn (fn [ks] (reduce + (map #(get-in % ks) hosts)))
-        mean-fn (fn [ks] (/ (sum-fn ks) (count hosts)))]
-    {:resources (hosts-resources)
-     :cpu       {:usage (mean-fn [:cpu :usedPercentage])
-                 :cores (cluster-cpus)}
-     :memory    {:usage (mean-fn [:memory :usedPercentage])
-                 :used  (sum-fn [:memory :used])
-                 :total (sum-fn [:memory :total])}
-     :disk      {:usage (mean-fn [:disk :usedPercentage])
-                 :used  (sum-fn [:disk :used])
-                 :total (sum-fn [:disk :total])}}))
+        n (count hosts)]
+    (if (zero? n)
+      {:resources {}
+       :cpu       {:usage 0 :cores 0}
+       :memory    {:usage 0 :used 0 :total 0}
+       :disk      {:usage 0 :used 0 :total 0}}
+      (let [sum-fn (fn [ks] (reduce + (map #(get-in % ks) hosts)))
+            mean-fn (fn [ks] (/ (sum-fn ks) n))]
+        {:resources (hosts-resources)
+         :cpu       {:usage (mean-fn [:cpu :usedPercentage])
+                     :cores (cluster-cpus)}
+         :memory    {:usage (mean-fn [:memory :usedPercentage])
+                     :used  (sum-fn [:memory :used])
+                     :total (sum-fn [:memory :total])}
+         :disk      {:usage (mean-fn [:disk :usedPercentage])
+                     :used  (sum-fn [:disk :used])
+                     :total (sum-fn [:disk :total])}})))) 
 
 (defn task-timeseries
   "Get task timeseries data for last 24 hours"
@@ -134,7 +152,7 @@
       (first)
       (m/->task-ts)))
 
-(def task-timeseries-memo (memo/ttl task-timeseries :ttl/threshold 60000))
+(def task-timeseries-memo (memo-ttl-safe task-timeseries 60000))
 
 (defn services-max-usage
   "Get services max usage info"
@@ -144,7 +162,7 @@
         (first)
         (get "series"))))
 
-(def services-max-usage-memo (memo/ttl services-max-usage :ttl/threshold (* 30 60000)))
+(def services-max-usage-memo (memo-ttl-safe services-max-usage (* 30 60000)))
 
 (defn services-timeseries
   "Get last 15 services timeseries data based on type for last 24 hours"
@@ -171,8 +189,8 @@
   (let [services-max-usage (services-max-usage-memo)]
     (services-timeseries services-max-usage :memory)))
 
-(def services-cpu-timeseries-memo (memo/ttl services-cpu-timeseries :ttl/threshold 60000))
-(def services-memory-timeseries-memo (memo/ttl services-memory-timeseries :ttl/threshold 60000))
+(def services-cpu-timeseries-memo (memo-ttl-safe services-cpu-timeseries 60000))
+(def services-memory-timeseries-memo (memo-ttl-safe services-memory-timeseries 60000))
 
 (defn hosts-timeseries
   "Get hosts timeseries data for last 24 hours"
@@ -186,4 +204,4 @@
          (map #(m/->host-ts %))
          (map #(update % :name node-name)))))
 
-(def hosts-timeseries-memo (memo/ttl hosts-timeseries :ttl/threshold 60000))
+(def hosts-timeseries-memo (memo-ttl-safe hosts-timeseries 60000))

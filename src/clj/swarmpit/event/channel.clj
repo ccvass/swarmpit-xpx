@@ -54,7 +54,8 @@
 (defn broadcast
   [{:keys [type message] :as event}]
   "Broadcast data to subscribers based on event subscription.
-   Broadcast processing is delayed for 1 second due to cluster sync"
+   Broadcast processing is delayed for 1 second due to cluster sync.
+   Dead clients are evicted on write failure."
   (go
     (<! (timeout 1000))
     (doseq [rule (filter #(rule/match? % type message) rule/list)]
@@ -62,19 +63,29 @@
             subscribers (subscribers subscription)]
         (doseq [subscriber subscribers]
           (let [user (subscription-user subscriber)
-                data (rule/subscribed-data rule message user)]
-            (send! (key subscriber) (event-data data) false)))))))
+                data (rule/subscribed-data rule message user)
+                ch (key subscriber)]
+            (send! ch (event-data data) false
+                   (fn [status]
+                     (when-not status
+                       (swap! hub dissoc ch)
+                       (log/debug "Evicted dead SSE client")))))))))
 
 (defn broadcast-statistics
   []
-  "Broadcast data with actual statistics records to all corresponding subscribers"
+  "Broadcast data with actual statistics records to all corresponding subscribers.
+   Dead clients are evicted on write failure."
   (go
     (let [subscribers (filter #(contains? stats/subscribers (:handler (subscription %))) @hub)]
       (doseq [subscriber subscribers]
         (let [user (subscription-user subscriber)
               subscription (subscription subscriber)
-              data (stats/subscribed-data subscription user)]
-          (send! (key subscriber) (event-data data) false))))))
+              data (stats/subscribed-data subscription user)
+              ch (key subscriber)]
+          (send! ch (event-data data) false
+                 (fn [status]
+                   (when-not status
+                     (swap! hub dissoc ch)))))))))
 
 ;; To prevent data duplicity/spam we cache:
 ;;
