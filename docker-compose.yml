@@ -48,9 +48,13 @@ services:
           memory: 128M
 
   influxdb:
-    image: influxdb:1.8
+    image: victoriametrics/victoria-metrics:latest
+    command:
+      - "-influxListenAddr=:8086"
+      - "-retentionPeriod=30d"
+      - "-search.latencyOffset=5s"
     volumes:
-      - influx-data:/var/lib/influxdb
+      - influx-data:/victoria-metrics-data
     networks:
       - net
     deploy:

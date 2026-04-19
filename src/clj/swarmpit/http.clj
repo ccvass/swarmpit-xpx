@@ -4,11 +4,14 @@
             [taoensso.encore :as enc]
             [taoensso.timbre :refer [error debug]]
             [swarmpit.log :refer [pretty-print pretty-print-ex]])
-  (:import (java.util.concurrent TimeoutException ExecutionException)
+  (:import (java.util.concurrent TimeoutException ExecutionException
+                                 Executors TimeUnit)
            (java.io IOException)
            (clojure.lang ExceptionInfo)))
 
 (def default-timeout 15000)
+
+(def ^:private vt-executor (Executors/newVirtualThreadPerTaskExecutor))
 
 (def ^:private req-func
   {:HEAD   http/head
@@ -23,19 +26,17 @@
          (when (some? (:body options))
            {:body (generate-string (:body options))})))
 
-(defmacro with-timeout
-  [ms & body]
-  `(try
-     (let [f# (future (do ~@body))
-           v# (gensym)
-           result# (deref f# ~ms v#)]
-       (if (= v# result#)
-         (do
-           (future-cancel f#)
-           (throw (TimeoutException.)))
-         result#))
-     (catch ExecutionException e#
-       (throw (.getCause e#)))))
+(defn- with-timeout
+  "Execute f on a virtual thread with timeout"
+  [ms f]
+  (let [future (.submit vt-executor ^Callable (fn [] (f)))]
+    (try
+      (.get future ms TimeUnit/MILLISECONDS)
+      (catch java.util.concurrent.TimeoutException _
+        (.cancel future true)
+        (throw (TimeoutException.)))
+      (catch ExecutionException e
+        (throw (.getCause e))))))
 
 (defn- error-response
   [response-data error-handler]
@@ -85,7 +86,7 @@
         request-method (req-func method)
         request-options (req-options options)]
     (try
-      (let [response (with-timeout timeout (request-method url request-options))
+      (let [response (with-timeout timeout #(request-method url request-options))
             response-body (-> response :body)
             response-headers (-> response :headers)
             response-status (-> response :status)
