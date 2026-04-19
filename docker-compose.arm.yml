@@ -3,6 +3,8 @@ services:
     image: swarmpit/swarmpit:latest
     environment:
       - SWARMPIT_DB=http://db:5984
+      - SWARMPIT_DB_USER=${COUCHDB_USER:-swarmpit}
+      - SWARMPIT_DB_PASSWORD=${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}
       - SWARMPIT_INFLUXDB=http://influxdb:8086
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -25,7 +27,10 @@ services:
         constraints:
           - node.role == manager
   db:
-    image: treehouses/couchdb:2.3.1
+    image: couchdb:3.3
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER:-swarmpit}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD:?COUCHDB_PASSWORD must be set}
     volumes:
       - db-data:/opt/couchdb/data
     networks:

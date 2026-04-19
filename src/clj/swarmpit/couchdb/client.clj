@@ -6,10 +6,12 @@
 
 (defn- execute
   [{:keys [method api options]}]
-  (let [url (str (config :db-url) api)]
+  (let [url (str (config :db-url) api)
+        auth (when-let [user (config :db-user)]
+               {:basic-auth [user (config :db-password)]})]
     (execute-in-scope {:method  method
                        :url     url
-                       :options options
+                       :options (merge auth options)
                        :scope   "DB"})))
 
 (defn get-doc
