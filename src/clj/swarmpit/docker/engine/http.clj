@@ -57,6 +57,7 @@
                                                 :connection-request-timeout  timeout-ms
                                                 :socket-timeout              timeout-ms
                                                 :connection-timeout          (max timeout-ms 5000)
+                                                :as                          :string
                                                 :retry-handler               (fn [& _] false)} options)
                          :scope         "Docker"
                          :timeout       (+ timeout-ms 5000)

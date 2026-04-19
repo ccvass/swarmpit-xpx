@@ -35,7 +35,7 @@
                  [clj-http "3.12.3"]
                  [clj-commons/clj-yaml "0.7.1"]
                  [cljs-ajax "0.8.0"]
-                 [cheshire "5.13.0"]
+                 [cheshire "5.10.0"]
                  [digest "1.4.5"]
                  [environ "1.1.0"]
                  [jarohen/chime "0.3.2"]
