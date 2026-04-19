@@ -26,7 +26,7 @@
                  [buddy/buddy-auth "3.0.323" :exclusions [cheshire]]
                  [buddy/buddy-sign "3.5.351" :exclusions [cheshire]]
                  [buddy/buddy-hashers "2.0.167"]
-                 [metosin/reitit "0.3.10"]
+                 [metosin/reitit "0.7.2"]
                  [clojure-humanize "0.2.2"]
                  [http-kit "2.8.0"]
                  [enlive "1.1.6"]
