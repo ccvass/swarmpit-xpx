@@ -1,20 +1,23 @@
 package swarmpit.socket;
 
+import jnr.unixsocket.UnixSocketAddress;
 import org.apache.http.HttpHost;
+import org.apache.http.conn.ConnectTimeoutException;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.protocol.HttpContext;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.file.Path;
+import java.net.SocketTimeoutException;
 
 public class UnixSocketFactory implements ConnectionSocketFactory {
 
-    private final Path socketPath;
+    private File socketFile;
 
     private UnixSocketFactory(String file) {
-        this.socketPath = Path.of(file);
+        this.socketFile = new File(file);
     }
 
     public static UnixSocketFactory createUnixSocketFactory(String socket) {
@@ -23,15 +26,18 @@ public class UnixSocketFactory implements ConnectionSocketFactory {
 
     @Override
     public Socket createSocket(HttpContext context) throws IOException {
-        // Socket connects to Unix domain socket in constructor
-        return new HttpUnixSocket(socketPath);
+        return new HttpUnixSocket();
     }
 
     @Override
     public Socket connectSocket(int connectTimeout, Socket sock, HttpHost host,
-                                InetSocketAddress remoteAddress, InetSocketAddress localAddress,
-                                HttpContext context) throws IOException {
-        // Already connected
+                                InetSocketAddress remoteAddress, InetSocketAddress localAddress, HttpContext context) throws IOException {
+        try {
+            sock.connect(new UnixSocketAddress(socketFile), connectTimeout);
+        } catch (SocketTimeoutException e) {
+            throw new ConnectTimeoutException(e, null, remoteAddress.getAddress());
+        }
+
         return sock;
     }
 }
