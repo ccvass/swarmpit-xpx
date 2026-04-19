@@ -1,35 +1,38 @@
 # Configuration
 
-Swarmpits behavior can be reconfigured via Environment Variables.
+Swarmpit XPX behavior can be reconfigured via environment variables.
+
+## `SWARMPIT_DB_PATH`
+
+Directory where the embedded SQLite database is stored.
+Default is `./data` (relative to working directory). Set to `/data` in Docker.
 
 ## `SWARMPIT_DOCKER_SOCK`
-Docker SOCK location used by docker client. In case of socket proxy use following format: `http://TCPENDPOINT:2375`.
+
+Docker socket location used by the Docker client. For TCP proxy use: `http://host:2375`.
 Default is `/var/run/docker.sock`.
 
 ## `SWARMPIT_DOCKER_API`
-Docker API version used by docker client.
-Default is `1.30`.
+
+Docker API version. Auto-negotiated via `/_ping` at startup. Override only if needed.
+Default is auto-negotiated (max `1.44`).
 
 ## `SWARMPIT_DOCKER_HTTP_TIMEOUT`
-Docker client http timeout in ms.
+
+Docker client HTTP timeout in milliseconds.
 Default is `5000`.
 
-## `SWARMPIT_DB`
-Swarmpit database (CouchDB) url. 
-Default is `http://localhost:5984`.
+## `SWARMPIT_LOG_LEVEL`
 
-## `SWARMPIT_INFLUXDB`
-Swarmpit statistics database (InfluxDB) url. If `nil` statistics are disabled. 
-Default is `nil`.
-
-## `SWARMPIT_AGENT_URL`
-Set address of agent. If `nil`, value is calculated dynamically. For DEV purpose only!!! 
-Default is `nil`.
-
-## `SWARMPIT_WORK_DIR`
-Swarmpit working directory location.
-Default is `/tmp`.
+Application log level: `debug`, `info`, `warn`, `error`.
+Default is `info`.
 
 ## `SWARMPIT_INSTANCE_NAME`
-Custom name shown in place of the swarmpit logo in the sidebar and top bar, and prepended to the browser tab title as `{instance_name} :: {page} :: swarmpit`. Useful when running multiple swarmpit instances against different clusters so you can tell them apart at a glance.
+
+Custom name shown in place of the swarmpit logo in the sidebar and top bar, and prepended to the browser tab title. Useful when running multiple instances against different clusters.
 Default is `nil` (shows the swarmpit logo).
+
+## `SWARMPIT_AGENT_URL`
+
+Static agent address. If `nil`, value is discovered dynamically. For development only.
+Default is `nil`.

@@ -1,82 +1,51 @@
-# How to contribute
+# How to Contribute
 
-Swarmpit is almost entirely written in Clojure, this allows seamless transition between frontend and backend development.
+Swarmpit XPX is written in Clojure (backend) and ClojureScript (frontend with Rum/React). Data is stored in embedded SQLite. Docker is connected via socket.
 
-Backend part of application runs in JVM and frontend utilizes custom React & [MaterialUI](http://www.material-ui.com/) components with [RUM](https://github.com/tonsky/rum). Persistent data are stored in CouchDB. Docker is connected via a
-socket.
+## Prerequisites
 
-[Leiningen](https://leiningen.org) manages project definition and its dependencies. [Figwheel](https://github.com/bhauman/lein-figwheel) is used for frontend hot-reloading.
+- Java 21+ (Eclipse Temurin recommended)
+- Leiningen 2.8.2+
+- Docker socket accessible at `/var/run/docker.sock`
 
-## Setting up a development environment
+## Development Environment
 
-Prerequisites
-- Leiningen 2.8.2 or newer
-- Docker socket accessible on `/var/run/docker.sock`
-
-Install local dependencies
-
-```
-lein deps
+```bash
+lein deps          # Install dependencies
+lein repl          # Start REPL
 ```
 
-Start a REPL session
+In the REPL, call `(fig-start)` to start the agent container and Figwheel dev server on http://localhost:3449.
 
-```
-lein repl
-```
-
-and call function `(fig-start)`, which will start db and agent containers followed by Swarmpit with Figwheel on http://localhost:3449
-
-In order to use REPL on frontend side call additionally `(cljs-repl)`. Both `(fig-start)` & `(cljs-repl)` are
-part of dev [`User`](dev/user.clj) namespace.
+For frontend REPL: `(cljs-repl)`. Both are in the `repl.user` namespace.
 
 ## Build
 
-Whole application can be build to `jar` file 
-
-```
-lein with-profile prod uberjar
-```
-
-and then packed into Docker image
-
-```
-docker build -t swarmpit .
+```bash
+lein with-profile prod uberjar    # Build production JAR
+docker build -t swarmpit-xpx .    # Build Docker image (multi-stage)
 ```
 
-### Custom cljsjs packages
+## Testing
 
-In case of outdated dependency feel free to build new version locally 
-
-```
-boot package install target
-```
-
-and deploy to local swarmpit repo e.g.
-
-```
-mvn deploy:deploy-file -Dfile=react-select-2.1.2-1.jar -DartifactId=react-select -Dversion=2.1.2 -DgroupId=cljsjs -Dpackaging=jar -Durl=file:repo
+```bash
+lein test              # Unit tests
+lein test :integration # Integration tests (requires Docker)
+lein test :all         # All tests
 ```
 
-Finally add dependency to your maven repository
+## Reporting Issues
 
-```
-lein deps
-```
+Create an issue at https://github.com/ccvass/swarmpit-xpx/issues with:
 
-## Reporting issues
-
-In case of unexpected swarmpit behaviour, please create well-written issue [here](https://github.com/swarmpit/swarmpit/issues/new). It makes it easier to find & fix the problem accordingly. Please follow the template below, we really appreciate the effort.
 ```
 Steps to reproduce:
-1. create a service with any image
-2. add an environment variable with name `MYVAR`
-3. set `MYVAR` value to be `firstpart=second=third`
-4. save the service
+1. ...
+2. ...
 
 What happens:
-- upon viewing the service, `MYVAR` with value `firstpart` 
+- ...
 
 What should happen:
-- upon viewing the service `MYVAR` should have value `firstpart=second=third`
+- ...
 ```
