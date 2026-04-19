@@ -80,9 +80,9 @@
    (defn decode-basic
      [token]
      (let [decoded (base64/decode (token-value token))
-           credentials (str/split decoded #":")]
-       {:username (first credentials)
-        :password (second credentials)})))
+           [username password] (str/split decoded #":" 2)]
+       {:username username
+        :password password})))
 
 #?(:cljs
    (defn decode-jwt
