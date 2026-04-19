@@ -88,14 +88,7 @@ For LLM-driven workflows, use the [MCP server](https://github.com/swarmpit/mcp) 
 
 ## Environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SWARMPIT_DB_PATH` | `/data` | Directory for SQLite database file |
-| `SWARMPIT_DOCKER_API` | auto-negotiated | Override Docker API version |
-| `SWARMPIT_DOCKER_SOCK` | `/var/run/docker.sock` | Docker socket path or TCP URL |
-| `SWARMPIT_DOCKER_HTTP_TIMEOUT` | `5000` | Docker API timeout (ms) |
-| `SWARMPIT_LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `SWARMPIT_INSTANCE_NAME` | none | Custom instance name in UI header |
+Refer to [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the full list.
 
 ## Development
 
