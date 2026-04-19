@@ -3,7 +3,6 @@
   (:require [org.httpkit.server :refer [send!]]
             [clojure.core.async :refer [go <! timeout]]
             [clojure.edn :as edn]
-            [clojure.tools.logging :as log]
             [clojure.walk :refer [keywordize-keys]]
             [cheshire.core :refer [generate-string]]
             [swarmpit.base64 :as base64]
@@ -52,39 +51,29 @@
 
 (defn broadcast
   [{:keys [type message] :as event}]
-  "Broadcast data to subscribers based on event subscription.
-   Broadcast processing is delayed for 1 second due to cluster sync.
-   Dead clients are evicted on write failure."
   (go
     (<! (timeout 1000))
     (doseq [rule (filter #(rule/match? % type message) rule/list)]
       (let [subscription (rule/subscription rule message)
-            subscribers (subscribers subscription)]
-        (doseq [subscriber subscribers]
+            subs (subscribers subscription)]
+        (doseq [subscriber subs]
           (let [user (subscription-user subscriber)
                 data (rule/subscribed-data rule message user)
                 ch (key subscriber)]
-            (send! ch (event-data data) false
-                   (fn [status]
-                     (when-not status
-                       (swap! hub dissoc ch)
-                       (log/debug "Evicted dead SSE client")))))))))
+            (when-not (send! ch (event-data data) false)
+              (swap! hub dissoc ch))))))))
 
 (defn broadcast-statistics
   []
-  "Broadcast data with actual statistics records to all corresponding subscribers.
-   Dead clients are evicted on write failure."
   (go
-    (let [subscribers (filter #(contains? stats/subscribers (:handler (subscription %))) @hub)]
-      (doseq [subscriber subscribers]
+    (let [subs (filter #(contains? stats/subscribers (:handler (subscription %))) @hub)]
+      (doseq [subscriber subs]
         (let [user (subscription-user subscriber)
-              subscription (subscription subscriber)
-              data (stats/subscribed-data subscription user)
+              sub (subscription subscriber)
+              data (stats/subscribed-data sub user)
               ch (key subscriber)]
-          (send! ch (event-data data) false
-                 (fn [status]
-                   (when-not status
-                     (swap! hub dissoc ch)))))))))
+          (when-not (send! ch (event-data data) false)
+            (swap! hub dissoc ch)))))))
 
 ;; To prevent data duplicity/spam we debounce:
 ;;
