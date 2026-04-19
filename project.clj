@@ -3,8 +3,8 @@
   :url "http://swarmpit.io"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.10.1"]
-                 [org.clojure/clojurescript "1.10.773"]
+  :dependencies [[org.clojure/clojure "1.12.0"]
+                 [org.clojure/clojurescript "1.11.132"]
                  [org.clojure/core.async "1.3.610"]
                  [org.clojure/core.cache "1.0.207"]
                  [org.clojure/tools.logging "1.1.0"]
