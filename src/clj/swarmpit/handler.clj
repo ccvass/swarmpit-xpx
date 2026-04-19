@@ -6,7 +6,8 @@
             [swarmpit.slt :as slt]
             [swarmpit.token :as token]
             [swarmpit.stats :as stats]
-            [swarmpit.version :as version]))
+            [swarmpit.version :as version]
+            [swarmpit.ratelimit :as rl]))
 
 (defn include-css [href revision]
   (first (html/html [:link {:href (str href "?r=" revision) :rel "stylesheet"}])))
@@ -76,16 +77,17 @@
 
 ;; Login handler
 
-(defn login
-  [{:keys [headers]}]
-  (let [token (get headers "authorization")]
-    (if (nil? token)
-      (resp-error 400 "Missing token")
-      (let [user (->> (token/decode-basic token)
-                      (api/user-by-credentials))]
-        (if (nil? user)
-          (resp-unauthorized "The username or password you entered is incorrect.")
-          (resp-ok {:token (token/generate-jwt user)}))))))
+(def login
+  (rl/wrap-login-ratelimit
+    (fn [{:keys [headers]}]
+      (let [token (get headers "authorization")]
+        (if (nil? token)
+          (resp-error 400 "Missing token")
+          (let [user (->> (token/decode-basic token)
+                          (api/user-by-credentials))]
+            (if (nil? user)
+              (resp-unauthorized "The username or password you entered is incorrect.")
+              (resp-ok {:token (token/generate-jwt user)}))))))))
 
 ;; Password handler
 
