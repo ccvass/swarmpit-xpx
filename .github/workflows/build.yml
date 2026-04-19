@@ -27,12 +27,6 @@ jobs:
         uses: DeLaGuardo/setup-clojure@9.5
         with:
           lein: latest
-      - run: ./init-db.sh
-        name: start DB
-        working-directory: dev/script
-      - run: ./init-influx.sh
-        name: start Influx
-        working-directory: dev/script
       - run: ./init-agent.sh
         name: start Agent
         working-directory: dev/script
