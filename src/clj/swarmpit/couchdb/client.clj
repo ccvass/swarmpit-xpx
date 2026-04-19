@@ -12,7 +12,9 @@
 ;; --- Datasource ---
 
 (defn- db-path []
-  (str (or (config :db-path) "/data") "/swarmpit.db"))
+  (let [dir (or (config :db-path) "/data")]
+    (.mkdirs (java.io.File. dir))
+    (str dir "/swarmpit.db")))
 
 (def ^:private ds
   (delay (jdbc/get-datasource {:dbtype "sqlite" :dbname (db-path)})))
