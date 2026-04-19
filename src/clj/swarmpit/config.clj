@@ -6,7 +6,7 @@
          :docker-api          "1.44"
          :docker-http-timeout 5000
          :log-level           "info"
-         :db-path             "/data"
+         :db-path             "./data"
          :agent-url           nil
          :work-dir            "/tmp"
          :instance-name       nil
