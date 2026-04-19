@@ -1,4 +1,35 @@
-# build artifacts
+# Environment & secrets
+.env
+.env.*
+!.env.example
+REMOTE.md
+
+# AI agents & copilot — NEVER track
+AGENTS.md
+.github/copilot-instructions.md
+.github/copilot*.md
+.copilot/
+.kiro/
+.cursor/
+.aider*
+.continue/
+.cline/
+.roo/
+.windsurf/
+.augment*
+codex.md
+claude.md
+CLAUDE.md
+.claude/
+lsp.json
+
+# Debug & screenshots — NEVER track
+debug/
+
+# Reference docs — NEVER track
+reference/
+
+# Build artifacts
 *.class
 *.jar
 !/repo/**/*.jar
@@ -9,7 +40,7 @@
 pom.xml
 pom.xml.asc
 
-# lein / repl
+# Lein / REPL
 /.lein-*
 /.nrepl-port
 /.repl
@@ -17,7 +48,7 @@ pom.xml.asc
 /checkouts/
 /lib/
 
-# editor / tooling — keep config, drop caches
+# Editor / tooling — keep config, drop caches
 /.calva
 /.clj-kondo/*
 !/.clj-kondo/config.edn
@@ -26,11 +57,24 @@ pom.xml.asc
 .settings
 .idea
 *.iml
+.vscode/
 
-# logs
-log
+# Logs
+log/
+*.log
 figwheel_server.log
 
-# emacs / os scratch
+# OS
+.DS_Store
+Thumbs.db
+*~
 \#*\#
 .\#*
+
+# Node (if frontend tooling added)
+node_modules/
+dist/
+
+# Database (local dev)
+*.db
+!/data/
