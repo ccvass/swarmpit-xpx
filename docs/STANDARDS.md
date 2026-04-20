@@ -33,9 +33,11 @@ Project-specific development rules for Swarmpit XPX.
 
 - **Embedded storage**: SQLite via next.jdbc (no external DB)
 - **In-memory stats**: Ring buffers in atoms (no external time-series DB)
-- **Virtual threads**: Java 21 VirtualThreadPerTaskExecutor for HTTP calls
-- **Circuit breakers**: `swarmpit.resilience` wraps external calls (Docker socket)
-- **Rate limiting**: `swarmpit.ratelimit` on sensitive endpoints
+- **Docker socket**: Java 21 native NIO SocketChannel over Unix domain sockets (no JNR, no Apache HttpClient)
+- **Aggressive caching**: Docker API reads cached 5s TTL (services, nodes, networks, tasks)
+- **Circuit breakers**: `swarmpit.resilience` wraps external calls
+- **Rate limiting**: `swarmpit.ratelimit` on login endpoint
+- **SPA fallback**: Non-API routes serve index.html (no 404 on refresh)
 
 ## Frontend
 

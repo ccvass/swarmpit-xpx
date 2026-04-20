@@ -36,3 +36,12 @@ Default is `nil` (shows the swarmpit logo).
 
 Static agent address. If `nil`, value is discovered dynamically. For development only.
 Default is `nil`.
+
+## Agent Configuration
+
+The Swarmpit agent needs to know where to send events. When deploying as a named stack (e.g., `tools`), set these environment variables on the agent service:
+
+- `EVENT_ENDPOINT` — URL for event push (e.g., `http://tools_swarmpit:8080/events`)
+- `HEALTH_CHECK_ENDPOINT` — URL for health check (e.g., `http://tools_swarmpit:8080/version`)
+
+The hostname must match the service name in the Docker overlay network.
