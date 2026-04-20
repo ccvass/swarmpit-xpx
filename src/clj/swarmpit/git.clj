@@ -2,22 +2,18 @@
   (:require [clojure.java.shell :as shell]
             [clojure.java.io :as io]
             [swarmpit.docker.engine.cli :as dcli]
-            [swarmpit.handler :refer [resp-ok resp-error]]
             [swarmpit.config :refer [config]]
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
-(defn- tmp-dir []
-  (str (config :work-dir) "/git-" (UUID/randomUUID)))
+(defn- tmp-dir [] (str (config :work-dir) "/git-" (UUID/randomUUID)))
 
 (defn- delete-dir [path]
   (let [f (io/file path)]
     (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete child)))))
+      (doseq [child (reverse (file-seq f))] (.delete child)))))
 
-(defn deploy-from-git!
-  [{:keys [repo-url branch compose-path stack-name]}]
+(defn deploy-from-git! [{:keys [repo-url branch compose-path stack-name]}]
   (let [dir (tmp-dir)
         branch (or branch "main")
         compose-path (or compose-path "docker-compose.yml")]
@@ -28,18 +24,14 @@
                           {:status 400 :type :api :body {:error (:err result)}})))
         (let [compose-file (io/file dir compose-path)]
           (when-not (.exists compose-file)
-            (throw (ex-info (str "Compose file not found: " compose-path)
+            (throw (ex-info "Compose file not found"
                             {:status 400 :type :api :body {:error "Compose file not found"}})))
           (dcli/stack-deploy stack-name (slurp compose-file))
           {:stack stack-name :source repo-url :branch branch}))
-      (finally
-        (delete-dir dir)))))
+      (finally (delete-dir dir)))))
 
-;; Handler
-
-(defn git-deploy
-  [{{:keys [body]} :parameters}]
-  (let [{:keys [repo-url branch compose-path stack-name]} body]
+(defn git-deploy [{{:keys [body]} :parameters}]
+  (let [{:keys [repo-url stack-name]} body]
     (if (and repo-url stack-name)
-      (resp-ok (deploy-from-git! body))
-      (resp-error 400 "repo-url and stack-name are required"))))
+      {:status 200 :body (deploy-from-git! body)}
+      {:status 400 :body {:error "repo-url and stack-name required"}})))

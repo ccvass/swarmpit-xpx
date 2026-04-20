@@ -1,7 +1,6 @@
 (ns swarmpit.audit
   (:require [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]
-            [swarmpit.handler :refer [resp-ok]]
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
@@ -23,8 +22,6 @@
     ["SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ? OFFSET ?" limit offset]
     {:builder-fn rs/as-unqualified-kebab-maps}))
 
-;; Middleware
-
 (defn wrap-audit [handler]
   (fn [request]
     (let [response (handler request)]
@@ -35,13 +32,9 @@
                 method (name (:request-method request))
                 uri (:uri request)]
             (record! user method "api" uri))
-          (catch Exception e
-            (log/debug "Audit record failed:" (.getMessage e)))))
+          (catch Exception e (log/debug "Audit:" (.getMessage e)))))
       response)))
 
-;; Handler
-
-(defn audit-list
-  [{{:keys [query]} :parameters}]
-  (resp-ok (list-entries :limit (or (:limit query) 50)
-                         :offset (or (:offset query) 0))))
+(defn audit-list [{{:keys [query]} :parameters}]
+  {:status 200
+   :body (list-entries :limit (or (:limit query) 50) :offset (or (:offset query) 0))})
