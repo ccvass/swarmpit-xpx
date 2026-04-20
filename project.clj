@@ -19,23 +19,23 @@
                  [cljsjs/chartjs "2.9.3-0"]
                  [rum "0.11.2" :exclusions [cljsjs/react cljsjs/react-dom]]
                  [sablono "0.8.4"]
-                 [ring "1.9.6" :exclusions [ring/ring-jetty-adapter]]
+                 [ring "1.12.2" :exclusions [ring/ring-jetty-adapter]]
                  [ring/ring-json "0.5.1"]
-                 [ring/ring-defaults "0.3.4" :exclusions [ring/ring-core]]
+                 [ring/ring-defaults "0.5.0" :exclusions [ring/ring-core]]
                  [bk/ring-gzip "0.3.0"]
                  [buddy/buddy-auth "3.0.323" :exclusions [cheshire]]
                  [buddy/buddy-sign "3.5.351" :exclusions [cheshire]]
                  [buddy/buddy-hashers "2.0.167"]
-                 [metosin/reitit "0.3.10"]
+                 [metosin/reitit "0.7.2"]
                  [clojure-humanize "0.2.2"]
                  [http-kit "2.8.0"]
                  [enlive "1.1.6"]
                  [expound "0.7.2"]
                  [clj-time "0.15.2"]
-                 [clj-http "3.12.3"]
+                 [clj-http "3.13.0"]
                  [clj-commons/clj-yaml "0.7.1"]
                  [cljs-ajax "0.8.0"]
-                 [cheshire "5.10.0"]
+                 [cheshire "5.13.0"]
                  [digest "1.4.5"]
                  [environ "1.1.0"]
                  [jarohen/chime "0.3.2"]
@@ -54,8 +54,7 @@
                  [com.cognitect.aws/iam "801.2.704.0"]
                  [com.cognitect.aws/sts "798.2.678.0"]
                  [org.yaml/snakeyaml "1.18"]
-                 [org.flatland/ordered "1.5.9"]
-                 [com.github.jnr/jnr-unixsocket "0.38.22"]]
+                 [org.flatland/ordered "1.5.9"]]
   :plugins [[lein-cljsbuild "1.1.8"]
             [lein-environ "1.1.0"]
             [lein-pprint "1.1.2"]
@@ -64,7 +63,6 @@
   :min-lein-version "2.8.2"
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
   :test-paths ["test/clj" "test/cljc"]
-  :java-source-paths ["src/java"]
   :test-selectors {:default     (complement :integration)
                    :integration :integration
                    :all         (constantly true)}
@@ -132,7 +130,7 @@
                        :source-paths ["dev"]
                        :repl-options {:nrepl-middleware [cider.piggieback/wrap-cljs-repl]}}
              :prod    {:source-paths ^:replace ["src/clj" "src/cljc"]
-                       :prep-tasks   ["javac" "compile" ["cljsbuild" "once" "min"]]
+                       :prep-tasks   ["compile" ["cljsbuild" "once" "min"]]
                        :omit-source  true
                        :aot          :all}
              :uberjar [:prod]})

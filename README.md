@@ -28,13 +28,15 @@ Swarmpit XPX fixes all of that:
 | Time-series | InfluxDB 1.8 (external, maintenance) | **In-memory** ring buffer |
 | Runtime | Java 11, Clojure 1.10 | **Java 21**, **Clojure 1.12** |
 | Concurrency | OS threads (limited pool) | **Virtual threads** (unlimited) |
-| Container user | root | **non-root** (swarmpit) |
+| Container user | root | root (Docker socket requires it) |
 | Auth protection | None | **Rate limiting** (5/min/IP) |
 | Error handling | Leaks stack traces | **Generic errors** (logged server-side) |
 | Health checks | Basic HTTP | **Liveness + Readiness** probes |
 | Resilience | None | **Circuit breakers** per dependency |
 | CORS | Wildcard `*` on SSE | **Same-origin only** |
 | Backup | 2 separate volumes | **Single file** (`swarmpit.db`) |
+| Docker socket | JNR Unix sockets (native lib) | **Java 21 NIO** (zero native deps) |
+| Dependencies | ring 1.8, reitit 0.3 | **ring 1.12, reitit 0.7** |
 | RAM usage | ~1.8 GB | **~1.0 GB** |
 
 ## Installation

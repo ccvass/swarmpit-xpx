@@ -779,7 +779,9 @@
 
 (defn stack-file
   [{{:keys [path]} :parameters}]
-  (let [response (api/stackfile (:name path))]
+  (let [response (or (api/stackfile (:name path))
+                     (when-let [spec (api/stack-compose (:name path))]
+                       {:name (:name path) :spec spec}))]
     (if (some? response)
       (resp-ok response)
       (resp-error 400 "Stackfile not found"))))
