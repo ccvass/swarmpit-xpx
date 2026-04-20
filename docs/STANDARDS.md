@@ -48,10 +48,23 @@ Project-specific development rules for Swarmpit XPX.
 
 ## Docker
 
-- Non-root container (user: `swarmpit`)
-- `tini` as init process
-- JVM flags: `-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0`
+- Runtime image includes `curl` for HTTP healthcheck
+- `HEALTHCHECK` calls `/health/live` every 30s
 - Multi-arch: amd64, arm64, armv7
+- Swarmex compatibility: requires `team` label + `--limit-memory` on deploy
+
+## Deployment (Swarmex clusters)
+
+Services require these labels/limits for the admission controller:
+
+```bash
+docker service update \
+  --label-add team=platform \
+  --label-add swarmex.remediation.max-level=restart \
+  --limit-memory 1G \
+  --with-registry-auth \
+  tools_swarmpit
+```
 
 ## Git Conventions
 

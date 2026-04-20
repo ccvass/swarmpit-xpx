@@ -45,3 +45,19 @@ The Swarmpit agent needs to know where to send events. When deploying as a named
 - `HEALTH_CHECK_ENDPOINT` — URL for health check (e.g., `http://tools_swarmpit:8080/version`)
 
 The hostname must match the service name in the Docker overlay network.
+
+## API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health/live` | GET | No | Liveness probe |
+| `/health/ready` | GET | No | Readiness probe (checks Docker + SQLite) |
+| `/version` | GET | No | App version and Docker API info |
+| `/api/webhooks/:token` | POST | No (token-based) | Trigger service redeploy |
+| `/api/webhooks` | POST | User | Create webhook for a service |
+| `/api/audit` | GET | Admin | View audit log |
+| `/api/stacks/git` | POST | User | Deploy stack from git repo |
+| `/exec/:id` | GET (WebSocket) | User | Interactive container shell |
+| `/api/services` | GET | User | List services |
+| `/api/nodes` | GET | User | List nodes |
+| `/api-docs` | GET | No | Swagger UI |

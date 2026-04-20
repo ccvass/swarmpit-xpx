@@ -86,6 +86,45 @@ docker service update --force swarmpit_app
 
 Everything the UI does is exposed via REST API (Swagger docs at `/api-docs`).
 
+### Webhook Auto-Update
+
+Trigger service redeploy from CI/CD pipelines without authentication:
+
+```bash
+# Create webhook for a service
+curl -X POST https://swarmpit/api/webhooks -H "Authorization: $TOKEN" \
+  -d '{"service-id": "abc123"}'
+# Returns: {"token": "uuid-token", "service-id": "abc123"}
+
+# Trigger redeploy (no auth needed — token IS the auth)
+curl -X POST https://swarmpit/api/webhooks/<token>
+```
+
+### Git-Based Stack Deploy
+
+Deploy stacks directly from a git repository:
+
+```bash
+curl -X POST https://swarmpit/api/stacks/git -H "Authorization: $TOKEN" \
+  -d '{"repo-url": "https://github.com/org/repo", "branch": "main", "stack-name": "myapp"}'
+```
+
+### Audit Log
+
+All mutating actions are logged. View audit trail (admin only):
+
+```bash
+curl https://swarmpit/api/audit -H "Authorization: $TOKEN"
+```
+
+### Container Exec
+
+WebSocket endpoint for interactive shell access:
+
+```
+ws://swarmpit/exec/<container-id>
+```
+
 For LLM-driven workflows, use the [MCP server](https://github.com/swarmpit/mcp) — manage your Swarm from Claude Code, Kiro, or any MCP-compatible client.
 
 ## Environment variables
