@@ -37,6 +37,34 @@
              :no-doc true
              :parameters {:body any?}
              #?@(:clj [:handler event-handler/event-push]))}]
+   ["/api/webhooks/:token"
+    {:name :webhook-trigger
+     :post (array-map
+             :no-doc true
+             #?@(:clj [:handler swarmpit.webhook/webhook-trigger]))}]
+   ["/api/webhooks"
+    {:name :webhook-create
+     :post (array-map
+             :no-doc true
+             #?@(:clj [:handler swarmpit.webhook/webhook-create]))
+     :delete (array-map
+               :no-doc true
+               #?@(:clj [:handler swarmpit.webhook/webhook-delete]))}]
+   ["/api/audit"
+    {:name :audit-list
+     :get  (array-map
+             :no-doc true
+             #?@(:clj [:handler swarmpit.audit/audit-list]))}]
+   ["/api/stacks/git"
+    {:name :git-deploy
+     :post (array-map
+             :no-doc true
+             #?@(:clj [:handler swarmpit.git/git-deploy]))}]
+   ["/exec/:id"
+    {:name :exec
+     :get  (array-map
+             :no-doc true
+             #?@(:clj [:handler swarmpit.exec/exec-handler]))}]
    ["/version"
     {:name :version
      :get  (array-map

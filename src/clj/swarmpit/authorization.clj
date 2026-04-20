@@ -67,6 +67,9 @@
              :handler any-access}
             {:pattern #"^/health/.*"
              :handler any-access}
+            {:pattern #"^/api/webhooks/[a-f0-9\-]+$"
+             :request-method :post
+             :handler any-access}
             {:pattern #"^/initialize$"
              :handler any-access}
             {:pattern #"^/slt"
@@ -75,6 +78,10 @@
              :handler any-access}
             {:pattern #"^/api/admin/.*"
              :handler {:and [authenticated-access admin-access]}}
+            {:pattern #"^/api/audit.*"
+             :handler {:and [authenticated-access admin-access]}}
+            {:pattern #"^/exec/.*"
+             :handler {:and [authenticated-access user-access]}}
             {:pattern #"^/$"
              :handler any-access}
             {:pattern        #"^/api/nodes/[a-zA-Z0-9]*$"

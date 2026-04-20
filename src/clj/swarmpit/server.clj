@@ -9,6 +9,7 @@
             [org.httpkit.server :refer [run-server]]
             [swarmpit.routes :as routes]
             [swarmpit.handler :as handler]
+            [swarmpit.audit :as audit]
             [swarmpit.setup :as setup]
             [swarmpit.database :as db]
             [swarmpit.agent :as agent]
@@ -61,7 +62,9 @@
    ;; coercing response body (disabled)
    ;coercion/coerce-response-middleware
    ;; coercing request parameters
-   coercion/coerce-request-middleware])
+   coercion/coerce-request-middleware
+   ;; audit logging
+   audit/wrap-audit])
 
 (def app
   (ring/ring-handler
