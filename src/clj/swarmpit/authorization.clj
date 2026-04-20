@@ -68,7 +68,6 @@
             {:pattern #"^/health/.*"
              :handler any-access}
             {:pattern #"^/api/webhooks/[a-zA-Z0-9\-]+$"
-             :request-method #{:post}
              :handler any-access}
             {:pattern #"^/initialize$"
              :handler any-access}
