@@ -5,7 +5,7 @@ services:
       - SWARMPIT_DB_PATH=/app/data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /mnt/swarmpit-xpx:/app/data
+      - swarmpit-data:/app/data
     ports:
       - 888:8080
     healthcheck:
@@ -17,9 +17,6 @@ services:
     networks:
       - net
     deploy:
-      labels:
-        team: platform
-        swarmex.remediation.max-level: restart
       resources:
         limits:
           memory: 1024M
@@ -43,8 +40,6 @@ services:
       mode: global
       labels:
         swarmpit.agent: 'true'
-        team: platform
-        swarmex.remediation.max-level: restart
       resources:
         limits:
           memory: 64M
@@ -54,3 +49,7 @@ services:
 networks:
   net:
     driver: overlay
+
+volumes:
+  swarmpit-data:
+    driver: local

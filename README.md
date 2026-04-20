@@ -44,18 +44,14 @@ Swarmpit XPX fixes all of that:
 The only requirement is Docker with Swarm initialized.
 
 ```bash
-# Create data directory on the host
-sudo mkdir -p /mnt/swarmpit-xpx
-
-# Deploy
 git clone https://github.com/ccvass/swarmpit-xpx.git
 docker stack deploy -c swarmpit-xpx/docker-compose.yml swarmpit
 ```
 
 Swarmpit XPX is available on port **888** by default.
 
-> **Important**: The bind mount `/mnt/swarmpit-xpx:/app/data` persists the SQLite database.
-> Without it, all data (users, registries, webhooks) is lost on container restart.
+> **Data persistence**: The compose uses a Docker volume `swarmpit-data` for the SQLite database.
+> For production, consider using a bind mount to a known host path for easier backups.
 
 For ARM clusters (Raspberry Pi, etc.):
 
@@ -75,11 +71,11 @@ Data persists in a single Docker volume (`app-data`) containing the SQLite datab
 ## Backup and restore
 
 ```bash
-# Backup (direct from host)
-cp /mnt/swarmpit-xpx/swarmpit.db ./backup.db
+# Backup
+docker cp $(docker ps -qf name=swarmpit_app):/app/data/swarmpit.db ./backup.db
 
 # Restore
-cp ./backup.db /mnt/swarmpit-xpx/swarmpit.db
+docker cp ./backup.db $(docker ps -qf name=swarmpit_app):/app/data/swarmpit.db
 docker service update --force swarmpit_app
 ```
 
