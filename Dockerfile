@@ -22,13 +22,14 @@ LABEL org.opencontainers.image.description="Hardened Docker Swarm management UI"
 
 COPY --from=docker:27.5-cli /usr/local/bin/docker /usr/local/bin/docker
 
-RUN mkdir -p /app /data /tmp/swarmpit
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /app /data /tmp/swarmpit
 
 WORKDIR /app
 COPY --from=builder /build/target/swarmpit.jar .
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-  CMD java -cp swarmpit.jar clojure.main -e '(System/exit 0)' || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fs http://localhost:8080/health/live || exit 1
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
