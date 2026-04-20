@@ -5,7 +5,7 @@
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
-(defn- conn [] @(resolve 'swarmpit.couchdb.client/ds))
+(defn- conn [] @@(resolve (quote swarmpit.couchdb.client/ds)))
 (defn- ok ([] {:status 200}) ([b] {:status 200 :body b}))
 (defn- err [s m] {:status s :body {:error m}})
 

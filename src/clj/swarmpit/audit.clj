@@ -4,7 +4,7 @@
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
-(defn- conn [] @(resolve 'swarmpit.couchdb.client/ds))
+(defn- conn [] @@(resolve (quote swarmpit.couchdb.client/ds)))
 
 (defn init-schema! []
   (jdbc/execute-one! (conn)
