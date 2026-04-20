@@ -1,31 +1,31 @@
 (ns swarmpit.webhook
   (:require [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]
+            [swarmpit.config :refer [config]]
             [swarmpit.docker.engine.client :as dc]
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
-(defn- conn [] @@(resolve (quote swarmpit.couchdb.client/ds)))
-(defn- ok ([] {:status 200}) ([b] {:status 200 :body b}))
-(defn- err [s m] {:status s :body {:error m}})
+(defn- ds []
+  (jdbc/get-datasource {:dbtype "sqlite" :dbname (str (config :db-path) "/swarmpit.db")}))
 
 (defn init-schema! []
-  (jdbc/execute-one! (conn)
+  (jdbc/execute-one! (ds)
     ["CREATE TABLE IF NOT EXISTS webhooks (
        id TEXT PRIMARY KEY, service_id TEXT NOT NULL, token TEXT UNIQUE NOT NULL,
        created_at INTEGER DEFAULT (strftime('%s','now')), last_triggered INTEGER)"]))
 
 (defn create-webhook [service-id]
   (let [token (str (UUID/randomUUID)) id (str (UUID/randomUUID))]
-    (jdbc/execute-one! (conn)
+    (jdbc/execute-one! (ds)
       ["INSERT INTO webhooks (id, service_id, token) VALUES (?, ?, ?)" id service-id token])
     {:token token :service-id service-id}))
 
 (defn delete-webhook [token]
-  (jdbc/execute-one! (conn) ["DELETE FROM webhooks WHERE token = ?" token]))
+  (jdbc/execute-one! (ds) ["DELETE FROM webhooks WHERE token = ?" token]))
 
 (defn- find-by-token [token]
-  (jdbc/execute-one! (conn)
+  (jdbc/execute-one! (ds)
     ["SELECT * FROM webhooks WHERE token = ?" token]
     {:builder-fn rs/as-unqualified-kebab-maps}))
 
@@ -38,16 +38,19 @@
         (dc/update-service (:service-id wh) version
           (assoc-in spec [:TaskTemplate :ForceUpdate]
                     (inc (or (get-in spec [:TaskTemplate :ForceUpdate]) 0))))
-        (jdbc/execute-one! (conn)
+        (jdbc/execute-one! (ds)
           ["UPDATE webhooks SET last_triggered = strftime('%s','now') WHERE token = ?" token])
         true)
       (catch Exception e (log/warn "Webhook trigger failed:" (.getMessage e)) nil))))
 
 (defn webhook-trigger [{{:keys [path]} :parameters}]
-  (if (trigger (:token path)) (ok {:status "triggered"}) (err 404 "Webhook not found")))
+  (if (trigger (:token path))
+    {:status 200 :body {:status "triggered"}}
+    {:status 404 :body {:error "Webhook not found"}}))
 
 (defn webhook-create [{{:keys [body]} :parameters}]
-  (ok (create-webhook (:service-id body))))
+  {:status 200 :body (create-webhook (:service-id body))})
 
 (defn webhook-delete [{{:keys [path]} :parameters}]
-  (delete-webhook (:token path)) (ok))
+  (delete-webhook (:token path))
+  {:status 200})
