@@ -23,18 +23,41 @@
 
 (def df-memo (memo/ttl df :ttl/threshold 10000))
 
+;; Aggressive cache for read-heavy endpoints (5s TTL)
+;; Prevents parallel UI requests from hammering the Docker socket
+
+(defn- services* []
+  (-> (execute {:method :GET :api "/services"}) :body))
+
+(def services-memo (memo/ttl services* :ttl/threshold 5000))
+
+(defn- nodes* []
+  (-> (execute {:method :GET :api "/nodes"}) :body))
+
+(def nodes-memo (memo/ttl nodes* :ttl/threshold 5000))
+
+(defn- networks* []
+  (-> (execute {:method :GET :api "/networks"}) :body))
+
+(def networks-memo (memo/ttl networks* :ttl/threshold 5000))
+
+(defn- tasks* []
+  (-> (execute {:method :GET :api "/tasks"}) :body))
+
+(def tasks-memo (memo/ttl tasks* :ttl/threshold 3000))
+
 ;; Service
 
 (defn services
   ([]
-   (-> (execute {:method :GET
-                 :api    "/services"})
-       :body))
+   (services-memo))
   ([label]
-   (-> (execute {:method  :GET
-                 :api     "/services"
-                 :options {:query-params (label-query label)}})
-       :body)))
+   (if (nil? label)
+     (services-memo)
+     (-> (execute {:method  :GET
+                   :api     "/services"
+                   :options {:query-params (label-query label)}})
+         :body))))
 
 (defn service
   [id]
@@ -115,9 +138,7 @@
 
 (defn tasks
   []
-  (-> (execute {:method :GET
-                :api    "/tasks"})
-      :body))
+  (tasks-memo))
 
 (defn task
   [id]
@@ -129,14 +150,14 @@
 
 (defn networks
   ([]
-   (-> (execute {:method :GET
-                 :api    "/networks"})
-       :body))
+   (networks-memo))
   ([label]
-   (-> (execute {:method  :GET
-                 :api     "/networks"
-                 :options {:query-params (label-query label)}})
-       :body)))
+   (if (nil? label)
+     (networks-memo)
+     (-> (execute {:method  :GET
+                   :api     "/networks"
+                   :options {:query-params (label-query label)}})
+         :body))))
 
 (defn network
   [id]
@@ -270,9 +291,7 @@
 
 (defn nodes
   []
-  (-> (execute {:method :GET
-                :api    "/nodes"})
-      :body))
+  (nodes-memo))
 
 (defn node
   [id]
