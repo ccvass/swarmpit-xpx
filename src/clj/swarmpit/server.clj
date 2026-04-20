@@ -8,6 +8,7 @@
             [swarmpit.authorization :refer [authorization-middleware]]
             [org.httpkit.server :refer [run-server]]
             [swarmpit.routes :as routes]
+            [swarmpit.handler :as handler]
             [swarmpit.setup :as setup]
             [swarmpit.database :as db]
             [swarmpit.agent :as agent]
@@ -85,7 +86,14 @@
          :url    "/api/swagger.json"
          :config {:validatorUrl     nil
                   :operationsSorter "alpha"}})
-      (-> (ring/create-default-handler)
+      (-> (fn [request]
+            (let [uri (:uri request)]
+              (if (or (re-matches #"^/api/.*" uri)
+                      (re-matches #"^/events.*" uri)
+                      (re-matches #"^/login$" uri)
+                      (re-matches #"^/slt$" uri))
+                {:status 404 :body {:error "Not found"}}
+                (handler/index request))))
           (wrap-resource "public")
           (wrap-defaults (assoc-in site-defaults [:security :anti-forgery] false))
           wrap-gzip))))
