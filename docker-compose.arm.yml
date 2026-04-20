@@ -1,20 +1,25 @@
 services:
   app:
-    image: swarmpit/swarmpit:latest
+    image: ghcr.io/ccvass/swarmpit-xpx:latest
+    environment:
+      - SWARMPIT_DB_PATH=/app/data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - app-data:/data
+      - /mnt/swarmpit-xpx:/app/data
     ports:
       - 888:8080
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/health/live"]
       interval: 30s
       timeout: 5s
-      start_period: 15s
+      start_period: 20s
       retries: 3
     networks:
       - net
     deploy:
+      labels:
+        team: platform
+        swarmex.remediation.max-level: restart
       resources:
         limits:
           memory: 1024M
@@ -27,7 +32,9 @@ services:
   agent:
     image: swarmpit/agent:latest
     environment:
-      - DOCKER_API_VERSION=1.44
+      - DOCKER_API_VERSION=1.47
+      - EVENT_ENDPOINT=http://app:8080/events
+      - HEALTH_CHECK_ENDPOINT=http://app:8080/version
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -36,6 +43,8 @@ services:
       mode: global
       labels:
         swarmpit.agent: 'true'
+        team: platform
+        swarmex.remediation.max-level: restart
       resources:
         limits:
           memory: 64M
@@ -45,7 +54,3 @@ services:
 networks:
   net:
     driver: overlay
-
-volumes:
-  app-data:
-    driver: local
