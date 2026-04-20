@@ -8,7 +8,11 @@
             [swarmpit.stats :as stats]
             [swarmpit.version :as version]
             [swarmpit.ratelimit :as rl]
-            [swarmpit.health :as health]))
+            [swarmpit.health :as health]
+            [swarmpit.webhook :as webhook]
+            [swarmpit.audit :as audit]
+            [swarmpit.git :as git]
+            [swarmpit.exec :as exec]))
 
 (defn include-css [href revision]
   (first (html/html [:link {:href (str href "?r=" revision) :rel "stylesheet"}])))
@@ -844,3 +848,17 @@
   (-> (api/stack-services (:name path))
       (api/resources-by-services :secrets api/secrets)
       (resp-ok)))
+
+;; Webhook handlers
+(def webhook-trigger webhook/webhook-trigger)
+(def webhook-create webhook/webhook-create)
+(def webhook-delete webhook/webhook-delete)
+
+;; Audit handler
+(def audit-list audit/audit-list)
+
+;; Git deploy handler
+(def git-deploy git/git-deploy)
+
+;; Exec handler
+(def exec-handler exec/exec-handler)

@@ -41,30 +41,30 @@
     {:name :webhook-trigger
      :post (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.webhook/webhook-trigger]))}]
+             #?@(:clj [:handler handler/webhook-trigger]))}]
    ["/api/webhooks"
     {:name :webhook-create
      :post (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.webhook/webhook-create]))
+             #?@(:clj [:handler handler/webhook-create]))
      :delete (array-map
                :no-doc true
-               #?@(:clj [:handler swarmpit.webhook/webhook-delete]))}]
+               #?@(:clj [:handler handler/webhook-delete]))}]
    ["/api/audit"
     {:name :audit-list
      :get  (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.audit/audit-list]))}]
+             #?@(:clj [:handler handler/audit-list]))}]
    ["/api/stacks/git"
     {:name :git-deploy
      :post (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.git/git-deploy]))}]
+             #?@(:clj [:handler handler/git-deploy]))}]
    ["/exec/:id"
     {:name :exec
      :get  (array-map
              :no-doc true
-             #?@(:clj [:handler swarmpit.exec/exec-handler]))}]
+             #?@(:clj [:handler handler/exec-handler]))}]
    ["/version"
     {:name :version
      :get  (array-map
