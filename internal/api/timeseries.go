@@ -84,8 +84,8 @@ func recordTimeseries(agentID string, event map[string]any) {
 			if v, ok := tm["cpuPercentage"].(float64); ok {
 				taskCPU = v / 100.0
 			}
-			if v, ok := tm["memoryPercentage"].(float64); ok {
-				taskMem = v
+			if v, ok := tm["memory"].(float64); ok {
+				taskMem = v // raw bytes — converted to MiB in getServiceTimeseries
 			}
 			tsStore.tasks[name] = appendPoint(tsStore.tasks[name], tsPoint{Ts: now, CPU: taskCPU, Memory: taskMem})
 
@@ -173,10 +173,10 @@ func getServiceTimeseries(sortBy string) []map[string]any {
 		for i, p := range points {
 			times[i] = p.Ts * 1000
 			cpus[i] = p.CPU
-			mems[i] = p.Memory
+			mems[i] = p.Memory / (1024 * 1024) // bytes to MiB
 		}
 		result = append(result, map[string]any{
-			"name": svc, "time": times, "cpu": cpus, "memory": mems,
+			"service": svc, "task": nil, "time": times, "cpu": cpus, "memory": mems,
 		})
 	}
 	if result == nil { result = []map[string]any{} }
@@ -194,9 +194,10 @@ func getTaskTimeseries(taskName string) []map[string]any {
 	for i, p := range points {
 		times[i] = p.Ts * 1000
 		cpus[i] = p.CPU
-		mems[i] = p.Memory
+		mems[i] = p.Memory / (1024 * 1024)
 	}
 	return []map[string]any{{
-		"name": taskName, "time": times, "cpu": cpus, "memory": mems,
+		"task": taskName, "service": extractServiceName(taskName),
+		"time": times, "cpu": cpus, "memory": mems,
 	}}
 }
