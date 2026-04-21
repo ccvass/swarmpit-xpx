@@ -69,7 +69,8 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 var agentStatsCache = struct {
 	sync.RWMutex
 	nodes map[string]map[string]any
-}{nodes: make(map[string]map[string]any)}
+	tasks map[string]map[string]any
+}{nodes: make(map[string]map[string]any), tasks: make(map[string]map[string]any)}
 
 func storeAgentStats(event map[string]any) {
 	// Agent sends: {"type": "stats", "message": {"id": "nodeId", "cpu": {...}, "memory": {...}, "disk": {...}}}
@@ -82,9 +83,53 @@ func storeAgentStats(event map[string]any) {
 	if !ok || id == "" {
 		return
 	}
+
 	agentStatsCache.Lock()
-	agentStatsCache.nodes[id] = msg
+	// Store node-level stats
+	nodeStats := map[string]any{}
+	if cpu, ok := msg["cpu"].(map[string]any); ok {
+		nodeStats["cpu"] = cpu
+	}
+	if mem, ok := msg["memory"].(map[string]any); ok {
+		nodeStats["memory"] = mem
+	}
+	if disk, ok := msg["disk"].(map[string]any); ok {
+		nodeStats["disk"] = disk
+	}
+	agentStatsCache.nodes[id] = nodeStats
+
+	// Store per-task stats from agent
+	if tasks, ok := msg["tasks"].([]any); ok {
+		for _, t := range tasks {
+			if tm, ok := t.(map[string]any); ok {
+				if tid, ok := tm["id"].(string); ok && tid != "" {
+					agentStatsCache.tasks[tid] = tm
+				}
+			}
+		}
+	}
 	agentStatsCache.Unlock()
+}
+
+// getNodeStatsCache returns a copy of node stats keyed by node ID
+func getNodeStatsCache() map[string]map[string]any {
+	agentStatsCache.RLock()
+	defer agentStatsCache.RUnlock()
+	r := make(map[string]map[string]any, len(agentStatsCache.nodes))
+	for k, v := range agentStatsCache.nodes {
+		r[k] = v
+	}
+	return r
+}
+
+// getTaskStats returns stats for a specific task, or nil
+func getTaskStats(taskID string) any {
+	agentStatsCache.RLock()
+	defer agentStatsCache.RUnlock()
+	if s, ok := agentStatsCache.tasks[taskID]; ok {
+		return s
+	}
+	return nil
 }
 
 func getAgentStats() (cpuUsage, memUsage float64, memUsed int64, diskUsage float64, diskUsed, diskTotal int64) {

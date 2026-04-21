@@ -94,7 +94,8 @@ func NodeList(w http.ResponseWriter, r *http.Request) {
 func NodeDetail(w http.ResponseWriter, r *http.Request) {
 	node, err := docker.Node(chi.URLParam(r, "id"))
 	if err != nil { jsonErr(w, 404, err.Error()); return }
-	json200(w, mapNode(node))
+	cache := getNodeStatsCache()
+	json200(w, mapNodeWithStats(node, cache[node.ID]))
 }
 
 func ServiceList(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +200,7 @@ func StackInfo(w http.ResponseWriter, r *http.Request) {
 func Stats(w http.ResponseWriter, r *http.Request) {
 	nodes, err := docker.Nodes()
 	if err != nil { jsonErr(w, 500, err.Error()); return }
+	cache := getNodeStatsCache()
 	totalCPU := 0.0
 	totalMem := int64(0)
 	resources := map[string]map[string]any{}
@@ -206,9 +208,12 @@ func Stats(w http.ResponseWriter, r *http.Request) {
 		if n.Status.State != "ready" { continue }
 		cpu := float64(n.Description.Resources.NanoCPUs) / 1e9
 		mem := n.Description.Resources.MemoryBytes
-		totalCPU += cpu
-		totalMem += mem
 		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
+		// Only count nodes with agent stats for totals
+		if _, hasStats := cache[n.ID]; hasStats {
+			totalCPU += cpu
+			totalMem += mem
+		}
 	}
 	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
 	json200(w, map[string]any{

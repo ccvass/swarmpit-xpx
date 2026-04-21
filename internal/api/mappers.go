@@ -46,7 +46,7 @@ func nilStr(s string) any {
 }
 
 func nilLabels(m map[string]string) any {
-	if len(m) == 0 {
+	if m == nil {
 		return nil
 	}
 	return m
@@ -91,6 +91,10 @@ func serviceResources(tt *swarm.TaskSpec) map[string]any {
 // ── Node ──
 
 func mapNode(n swarm.Node) map[string]any {
+	return mapNodeWithStats(n, nil)
+}
+
+func mapNodeWithStats(n swarm.Node, nodeStats map[string]any) map[string]any {
 	role := string(n.Spec.Role)
 	var addr string
 	if role == "manager" && n.ManagerStatus != nil {
@@ -117,6 +121,11 @@ func mapNode(n swarm.Node) map[string]any {
 			vols = append(vols, p.Name)
 		}
 	}
+	// Build stats from agent cache
+	var stats any
+	if nodeStats != nil {
+		stats = nodeStats
+	}
 	return map[string]any{
 		"id": n.ID, "version": n.Version.Index,
 		"nodeName": n.Description.Hostname, "role": role,
@@ -129,13 +138,15 @@ func mapNode(n swarm.Node) map[string]any {
 		"resources": resources(&n.Description.Resources),
 		"plugins": map[string]any{"networks": nets, "volumes": vols},
 		"leader":  leader,
+		"stats":   stats,
 	}
 }
 
 func mapNodes(nodes []swarm.Node) []map[string]any {
+	cache := getNodeStatsCache()
 	r := make([]map[string]any, len(nodes))
 	for i, n := range nodes {
-		r[i] = mapNode(n)
+		r[i] = mapNodeWithStats(n, cache[n.ID])
 	}
 	return r
 }
@@ -331,6 +342,7 @@ func mapTask(t swarm.Task, nodes []swarm.Node, services []swarm.Service, info sy
 		"resources":    res,
 		"nodeId":       t.NodeID,
 		"nodeName":     nodeName,
+		"stats":        getTaskStats(t.ID),
 	}
 }
 
@@ -597,11 +609,21 @@ func mapService(s swarm.Service, tasks []swarm.Task, networks []types.NetworkRes
 	// healthcheck
 	var healthcheck any
 	if cs.Healthcheck != nil {
+		var interval, timeout, retries any
+		if v := nanoToSec(int64(cs.Healthcheck.Interval)); v != 0 {
+			interval = v
+		}
+		if v := nanoToSec(int64(cs.Healthcheck.Timeout)); v != 0 {
+			timeout = v
+		}
+		if cs.Healthcheck.Retries != 0 {
+			retries = cs.Healthcheck.Retries
+		}
 		healthcheck = map[string]any{
 			"test":     cs.Healthcheck.Test,
-			"interval": nanoToSec(int64(cs.Healthcheck.Interval)),
-			"timeout":  nanoToSec(int64(cs.Healthcheck.Timeout)),
-			"retries":  cs.Healthcheck.Retries,
+			"interval": interval,
+			"timeout":  timeout,
+			"retries":  retries,
 		}
 	}
 
@@ -742,8 +764,93 @@ func mapStack(name string, services []swarm.Service, tasks []swarm.Task, network
 	if len(stackSvcs) == 0 {
 		state = "inactive"
 	}
+
+	// Collect unique networks, volumes, configs, secrets from stack services
+	netMap := map[string]types.NetworkResource{}
+	for _, n := range networks {
+		netMap[n.ID] = n
+	}
+	seenNets := map[string]bool{}
+	stackNets := []map[string]any{}
+	seenVols := map[string]bool{}
+	stackVols := []any{}
+	seenCfgs := map[string]bool{}
+	stackCfgs := []map[string]any{}
+	seenSecs := map[string]bool{}
+	stackSecs := []map[string]any{}
+
+	for _, s := range services {
+		if s.Spec.Labels["com.docker.stack.namespace"] != name {
+			continue
+		}
+		cs := s.Spec.TaskTemplate.ContainerSpec
+		// networks
+		for _, n := range s.Spec.TaskTemplate.Networks {
+			if !seenNets[n.Target] {
+				seenNets[n.Target] = true
+				if nr, ok := netMap[n.Target]; ok {
+					stackNets = append(stackNets, mapNetwork(nr))
+				}
+			}
+		}
+		// volumes from mounts
+		for _, m := range cs.Mounts {
+			if string(m.Type) == "volume" && !seenVols[m.Source] {
+				seenVols[m.Source] = true
+				mt := map[string]any{
+					"containerPath": m.Target, "host": m.Source,
+					"type": string(m.Type), "id": m.Source,
+					"volumeOptions": nil, "readOnly": m.ReadOnly, "stack": nil,
+				}
+				if m.VolumeOptions != nil {
+					vo := map[string]any{"labels": nilLabels(m.VolumeOptions.Labels), "driver": nil}
+					if m.VolumeOptions.DriverConfig != nil {
+						vo["driver"] = map[string]any{"name": m.VolumeOptions.DriverConfig.Name, "options": m.VolumeOptions.DriverConfig.Options}
+					}
+					mt["volumeOptions"] = vo
+					if m.VolumeOptions.Labels != nil {
+						mt["stack"] = nilStr(m.VolumeOptions.Labels["com.docker.stack.namespace"])
+					}
+				}
+				stackVols = append(stackVols, mt)
+			}
+		}
+		// configs
+		for _, cfg := range cs.Configs {
+			if !seenCfgs[cfg.ConfigID] {
+				seenCfgs[cfg.ConfigID] = true
+				cm := map[string]any{"id": cfg.ConfigID, "configName": cfg.ConfigName, "configTarget": nil, "uid": nil, "gid": nil, "mode": nil}
+				if cfg.File != nil {
+					cm["configTarget"] = cfg.File.Name
+					cm["uid"] = cfg.File.UID
+					cm["gid"] = cfg.File.GID
+					cm["mode"] = cfg.File.Mode
+				}
+				stackCfgs = append(stackCfgs, cm)
+			}
+		}
+		// secrets
+		for _, sec := range cs.Secrets {
+			if !seenSecs[sec.SecretID] {
+				seenSecs[sec.SecretID] = true
+				sm := map[string]any{"id": sec.SecretID, "secretName": sec.SecretName, "secretTarget": nil, "uid": nil, "gid": nil, "mode": nil}
+				if sec.File != nil {
+					sm["secretTarget"] = sec.File.Name
+					sm["uid"] = sec.File.UID
+					sm["gid"] = sec.File.GID
+					sm["mode"] = sec.File.Mode
+				}
+				stackSecs = append(stackSecs, sm)
+			}
+		}
+	}
+	if stackNets == nil { stackNets = []map[string]any{} }
+	if stackVols == nil { stackVols = []any{} }
+	if stackCfgs == nil { stackCfgs = []map[string]any{} }
+	if stackSecs == nil { stackSecs = []map[string]any{} }
+
 	return map[string]any{
 		"stackName": name, "state": state, "services": stackSvcs,
-		"networks": []any{}, "volumes": []any{}, "configs": []any{}, "secrets": []any{},
+		"networks": stackNets, "volumes": stackVols, "configs": stackCfgs, "secrets": stackSecs,
 	}
 }
