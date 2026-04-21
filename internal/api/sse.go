@@ -89,10 +89,6 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 
 func broadcastDashboard() {
 	nodes, _ := docker.Nodes()
-	svcs, _ := docker.Services()
-	tasks, _ := docker.Tasks()
-	nets, _ := docker.Networks()
-	info, _ := docker.Info()
 	cache := getNodeStatsCache()
 	totalCPU := 0.0
 	totalMem := int64(0)
@@ -133,7 +129,6 @@ func broadcastDashboard() {
 	}
 	Broadcast(map[string]any{
 		"stats":              stats,
-		"services":           mapServices(svcs, tasks, nets, info),
 		"nodes":              mapNodes(nodes),
 		"nodes-ts":           getHostTimeseries(),
 		"services-ts-cpu":    getServiceTimeseries("cpu"),
