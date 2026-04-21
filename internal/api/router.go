@@ -40,10 +40,13 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Use(auth.Middleware)
 
 		r.Get("/api/nodes", NodeList)
+		r.Get("/api/nodes/ts", NodeTimeseries)
 		r.Get("/api/nodes/{id}", NodeDetail)
+		r.Get("/api/stats", Stats)
 		r.Get("/api/services", ServiceList)
 		r.Get("/api/services/{id}", ServiceInfo)
 		r.Get("/api/services/{id}/logs", ServiceLogs)
+		r.Get("/api/services/{id}/tasks", ServiceTaskList)
 		r.Delete("/api/services/{id}", ServiceDelete)
 		r.Get("/api/tasks", TaskList)
 		r.Get("/api/tasks/{id}", TaskInfo)

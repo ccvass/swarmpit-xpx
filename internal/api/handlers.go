@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
 	"github.com/ccvass/swarmpit-xpx/internal/docker"
@@ -106,8 +107,25 @@ func ServiceList(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServiceInfo(w http.ResponseWriter, r *http.Request) {
-	svc, err := docker.Service(chi.URLParam(r, "id"))
-	if err != nil { jsonErr(w, 404, err.Error()); return }
+	id := chi.URLParam(r, "id")
+	// Docker SDK accepts both full ID and service name
+	svc, err := docker.Service(id)
+	if err != nil {
+		// Try finding by short ID prefix in the list
+		svcs, _ := docker.Services()
+		found := false
+		for _, s := range svcs {
+			if strings.HasPrefix(s.ID, id) {
+				svc = s
+				found = true
+				break
+			}
+		}
+		if !found {
+			jsonErr(w, 404, "Service not found")
+			return
+		}
+	}
 	tasks, _ := docker.Tasks()
 	nets, _ := docker.Networks()
 	info, _ := docker.Info()
@@ -174,6 +192,54 @@ func StackInfo(w http.ResponseWriter, r *http.Request) {
 	nets, _ := docker.Networks()
 	info, _ := docker.Info()
 	json200(w, mapStack(name, svcs, tasks, nets, info))
+}
+
+
+// Stats returns cluster resource stats (CPU, memory, disk from node resources)
+func Stats(w http.ResponseWriter, r *http.Request) {
+	nodes, err := docker.Nodes()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	totalCPU := 0.0
+	totalMem := int64(0)
+	resources := map[string]map[string]any{}
+	for _, n := range nodes {
+		if n.Status.State != "ready" { continue }
+		cpu := float64(n.Description.Resources.NanoCPUs) / 1e9
+		mem := n.Description.Resources.MemoryBytes
+		totalCPU += cpu
+		totalMem += mem
+		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
+	}
+	json200(w, map[string]any{
+		"resources": resources,
+		"cpu":    map[string]any{"usage": 0, "cores": totalCPU},
+		"memory": map[string]any{"usage": 0, "used": 0, "total": totalMem},
+		"disk":   map[string]any{"usage": 0, "used": 0, "total": 0},
+	})
+}
+
+
+// NodeTimeseries returns empty timeseries (stats not implemented in Go backend yet)
+func NodeTimeseries(w http.ResponseWriter, r *http.Request) {
+	json200(w, []any{})
+}
+
+// ServiceTaskList returns tasks for a specific service
+func ServiceTaskList(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tasks, err := docker.Tasks()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	nodes, _ := docker.Nodes()
+	svcs, _ := docker.Services()
+	info, _ := docker.Info()
+	var result []map[string]any
+	for _, t := range tasks {
+		if t.ServiceID == id || strings.HasPrefix(t.ServiceID, id) {
+			result = append(result, mapTask(t, nodes, svcs, info))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
 }
 
 func TaskInfo(w http.ResponseWriter, r *http.Request) {
