@@ -1,0 +1,160 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "swarmpit-xpx" [ref=e7] [cursor=pointer]:
+          - /url: https://github.com/ccvass/swarmpit-xpx
+          - generic [ref=e8]:
+            - img [ref=e9]
+            - generic [ref=e10]: swarmpit-xpx
+        - button "a" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]:
+            - generic [ref=e16]: a
+            - img [ref=e19]
+    - navigation:
+      - generic [ref=e22]:
+        - link "swarmpit-xpx" [ref=e25] [cursor=pointer]:
+          - /url: https://github.com/ccvass/swarmpit-xpx
+          - generic [ref=e26]:
+            - img [ref=e27]
+            - generic [ref=e28]: swarmpit-xpx
+        - generic [ref=e29]:
+          - link "Dashboard" [ref=e30] [cursor=pointer]:
+            - /url: "#/"
+            - img [ref=e32]
+            - heading "Dashboard" [level=6] [ref=e35]
+          - link "Registries" [ref=e36] [cursor=pointer]:
+            - /url: "#/registries"
+            - img [ref=e38]
+            - heading "Registries" [level=6] [ref=e41]
+          - listitem [ref=e42]:
+            - generic [ref=e43]: APPLICATIONS
+          - link "Stacks" [ref=e44] [cursor=pointer]:
+            - /url: "#/stacks"
+            - img [ref=e46]
+            - heading "Stacks" [level=6] [ref=e49]
+          - link "Services" [ref=e50] [cursor=pointer]:
+            - /url: "#/services"
+            - img [ref=e52]
+            - heading "Services" [level=6] [ref=e55]
+          - link "Tasks" [ref=e56] [cursor=pointer]:
+            - /url: "#/tasks"
+            - img [ref=e58]
+            - heading "Tasks" [level=6] [ref=e61]
+          - listitem [ref=e62]:
+            - generic [ref=e63]: INFRASTRUCTURE
+          - link "Networks" [ref=e64] [cursor=pointer]:
+            - /url: "#/networks"
+            - img [ref=e66]
+            - heading "Networks" [level=6] [ref=e69]
+          - link "Nodes" [ref=e70] [cursor=pointer]:
+            - /url: "#/nodes"
+            - img [ref=e72]
+            - heading "Nodes" [level=6] [ref=e75]
+          - listitem [ref=e76]:
+            - generic [ref=e77]: DATA
+          - link "Volumes" [ref=e78] [cursor=pointer]:
+            - /url: "#/volumes"
+            - img [ref=e80]
+            - heading "Volumes" [level=6] [ref=e83]
+          - link "Secrets" [ref=e84] [cursor=pointer]:
+            - /url: "#/secrets"
+            - img [ref=e86]
+            - heading "Secrets" [level=6] [ref=e89]
+          - link "Configs" [ref=e90] [cursor=pointer]:
+            - /url: "#/configs"
+            - img [ref=e92]
+            - heading "Configs" [level=6] [ref=e95]
+        - generic [ref=e97]:
+          - separator [ref=e98]
+          - generic [ref=e99]:
+            - generic [ref=e100]: swarmpit-xpx 2.2.0
+            - generic [ref=e101]: engine 28.5.1 API 1.51
+          - link "Swagger API" [ref=e102] [cursor=pointer]:
+            - /url: /api-docs
+            - heading "Swagger API" [level=6] [ref=e104]
+            - img [ref=e106]
+    - main [ref=e108]:
+      - generic [ref=e1576]:
+        - generic "tabs" [ref=e1577]:
+          - tablist [ref=e1580]:
+            - tab "General" [selected] [ref=e1581] [cursor=pointer]:
+              - generic [ref=e1582]: General
+            - tab "Network" [ref=e1583] [cursor=pointer]:
+              - generic [ref=e1584]: Network
+            - tab "Environment" [ref=e1585] [cursor=pointer]:
+              - generic [ref=e1586]: Environment
+            - tab "Resources" [ref=e1587] [cursor=pointer]:
+              - generic [ref=e1588]: Resources
+            - tab "Deployment" [ref=e1589] [cursor=pointer]:
+              - generic [ref=e1590]: Deployment
+            - tab "Logs" [ref=e1591] [cursor=pointer]:
+              - generic [ref=e1592]: Logs
+        - separator [ref=e1594]
+        - generic [ref=e1595]:
+          - generic [ref=e1597]: Edit service
+          - tabpanel [ref=e1599]:
+            - generic [ref=e1602]:
+              - generic [ref=e1604]:
+                - generic:
+                  - text: Image
+                  - generic: "*"
+                - generic [ref=e1605]:
+                  - textbox [disabled] [ref=e1606]: registry.labtau.com/ccvass/bpo_crm_api
+                  - group
+              - combobox [ref=e1608]:
+                - generic [ref=e1609]:
+                  - generic: Search a tag
+                  - generic [ref=e1610]:
+                    - textbox "Search a tag" [ref=e1611]: 3.8.93
+                    - group
+                  - paragraph [ref=e1613]: Specify image tag or leave empty for latest
+              - generic [ref=e1614]:
+                - group [ref=e1615]:
+                  - generic [ref=e1616]: Mode
+                  - radiogroup [ref=e1617]:
+                    - generic [ref=e1618]:
+                      - generic:
+                        - generic:
+                          - radio "Replicated" [checked] [disabled]
+                          - generic:
+                            - img
+                            - img
+                      - generic [ref=e1619]: Replicated
+                    - generic [ref=e1620]:
+                      - generic:
+                        - generic:
+                          - radio "Global" [disabled]
+                          - generic:
+                            - img
+                      - generic [ref=e1621]: Global
+                - generic [ref=e1622]:
+                  - generic:
+                    - text: Replicas
+                    - generic: "*"
+                  - generic [ref=e1623]:
+                    - spinbutton [ref=e1624]: "3"
+                    - group
+              - generic [ref=e1626]:
+                - generic: Entrypoint
+                - generic [ref=e1627]:
+                  - textbox [ref=e1628]
+                  - group
+                - paragraph [ref=e1629]: Overrides the image ENTRYPOINT. Command above is passed as arguments.
+              - generic [ref=e1631]:
+                - generic: Command
+                - generic [ref=e1632]:
+                  - textbox [ref=e1633]: gunicorn app:app --log-level debug --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:9002 -c gunicorn_config.py --timeout 360
+                  - group
+                - paragraph [ref=e1634]: The command to be run in the image
+          - generic [ref=e1635]:
+            - button "Deploy" [ref=e1637] [cursor=pointer]:
+              - generic [ref=e1638]:
+                - img [ref=e1640]
+                - text: Deploy
+            - button "Previous" [disabled]:
+              - generic: Previous
+            - button "Next" [ref=e1642] [cursor=pointer]:
+              - generic [ref=e1643]: Next
+  - img [ref=e1535]
+  - generic [ref=e1537]: vCPU

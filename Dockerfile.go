@@ -119,6 +119,8 @@ RUN sed -i \
     -e 's/\" :: swarmpit\"/" :: swarmpit-xpx"/g' \
     -e 's/hma\.Dg\.get\.call(null,c,"networkName")/c\&\&hma.Dg?hma.Dg.get.call(null,c,"networkName"):""/g' \
     -e 's/Vma\.Dg\.get\.call(null,c,"rule")/c\&\&Vma.Dg?Vma.Dg.get.call(null,c,"rule"):""/g' \
+    -e 's/"network-autocomplete",oz,!0,Sr,!0,Nv,a,cI,b/"network-autocomplete",oz,!0,Sr,!0,Nv,a||[],cI,b||[]/g' \
+    -e 's/"placement-autocomplete",oz,!0,Sr,!0,cI,b,Nv,a/"placement-autocomplete",oz,!0,Sr,!0,cI,b||[],Nv,a||[]/g' \
     /app/public/js/main.js
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
