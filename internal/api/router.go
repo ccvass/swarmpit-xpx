@@ -51,13 +51,18 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	// Static + SPA fallback
 	fileServer := http.FileServer(http.FS(staticFS))
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		f, err := staticFS.Open(r.URL.Path[1:])
+		path := r.URL.Path[1:] // strip leading /
+		if path == "" {
+			path = "index.html"
+		}
+		f, err := staticFS.Open(path)
 		if err == nil {
 			f.Close()
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		r.URL.Path = "/"
+		// SPA fallback — serve index.html
+		r.URL.Path = "/index.html"
 		fileServer.ServeHTTP(w, r)
 	})
 
