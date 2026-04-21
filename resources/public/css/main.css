@@ -39,7 +39,7 @@ html > body {
 }
 
 a {
-    color: #65519f;
+    color: #1565C0;
 }
 
 .link {
@@ -74,7 +74,7 @@ a {
 }
 
 .Swarmpit-new-tab:hover {
-    color: #65519f;
+    color: #1565C0;
 }
 
 .Swarmpit-root {
@@ -121,7 +121,7 @@ a {
 }
 
 .Swarmpit-card-avatar {
-    background-color: #65519f !important;
+    background-color: #1565C0 !important;
 }
 
 .Swarmpit-card-header-responsive-title {
@@ -486,7 +486,7 @@ html.dark .MuiAutocomplete-paper {
 
 .Swarmpit-drawer-item:hover > div,
 .Swarmpit-drawer-item:hover > div > h6 {
-    color: #65519f !important;
+    color: #1565C0 !important;
 }
 
 .Swarmpit-drawer-item > *:hover {
@@ -525,7 +525,7 @@ html.dark .MuiAutocomplete-paper {
 
 .Swarmpit-drawer-item-icon-selected,
 .Swarmpit-drawer-item-text-selected > h6 {
-    color: #65519f !important;
+    color: #1565C0 !important;
     font-weight: 600 !important;
 }
 
@@ -672,11 +672,11 @@ html.dark .Swarmpit-login-instance {
 
 .Swarmpit-login-avatar {
     margin: 8px;
-    background-color: #65519f;
+    background-color: #1565C0;
 }
 
 .Swarmpit-login-text {
-    color: #65519f !important;
+    color: #1565C0 !important;
 }
 
 .Swarmpit-login-form {
@@ -694,7 +694,7 @@ html.dark .Swarmpit-login-instance {
 }
 
 .Swarmpit-progress-button {
-    color: #65519f;
+    color: #1565C0;
     position: absolute;
     top: 50%;
     left: 50%;
@@ -902,8 +902,8 @@ html.dark .Swarmpit-login-instance {
     margin-top: -20px;
     margin-right: 15px;
     border-radius: 3px;
-    background: #65519f;
-    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .14), 0 7px 10px -5px #65519f;
+    background: #1565C0;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .14), 0 7px 10px -5px #1565C0;
 }
 
 .Swarmpit-fcard-header-title {
@@ -913,9 +913,9 @@ html.dark .Swarmpit-login-instance {
     margin-top: -36px !important;
     margin-right: 0 !important;
     border-radius: 3px;
-    background: #65519f;
+    background: #1565C0;
     font-weight: lighter !important;
-    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .14), 0 7px 10px -5px #65519f;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .14), 0 7px 10px -5px #1565C0;
 }
 
 .Swarmpit-fcard-content {
@@ -1209,7 +1209,7 @@ html.dark .Swarmpit-login-instance {
 }
 
 .Swarmpit-label-primary {
-    background-color: #65519f !important;
+    background-color: #1565C0 !important;
 }
 
 .Swarmpit-label-grey,
