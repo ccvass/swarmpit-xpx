@@ -142,7 +142,9 @@
   (state/set-value {:list []} networks/form-state-cursor)
   (state/set-value {:list []} placement/form-state-cursor)
   (state/set-value {:names []} labels/form-state-cursor)
-  (state/set-value {:valid? true} resources/form-state-cursor))
+  (state/set-value {:valid? true} resources/form-state-cursor)
+  (state/set-value [] networks/form-value-cursor)
+  (state/set-value [] placement/form-value-cursor))
 
 (def mixin-init-form
   (mixin/init-form
