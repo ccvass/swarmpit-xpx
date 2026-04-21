@@ -92,7 +92,7 @@ func NodeList(w http.ResponseWriter, r *http.Request) {
 }
 
 func NodeDetail(w http.ResponseWriter, r *http.Request) {
-	node, err := docker.Node(chi.URLParam(r, "id"))
+	node, err := docker.Node(resolveNodeID(chi.URLParam(r, "id")))
 	if err != nil { jsonErr(w, 404, err.Error()); return }
 	cache := getNodeStatsCache()
 	json200(w, mapNodeWithStats(node, cache[node.ID]))
@@ -472,6 +472,17 @@ func resolveServiceID(id string) string {
 	return id
 }
 
+
+func resolveNodeID(id string) string {
+	nodes, _ := docker.Nodes()
+	for _, n := range nodes {
+		if n.ID == id || n.Description.Hostname == id {
+			return n.ID
+		}
+	}
+	return id
+}
+
 func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 	logs, err := docker.ServiceLogs(resolveServiceID(chi.URLParam(r, "id")), r.URL.Query().Get("tail"))
 	if err != nil { jsonErr(w, 500, err.Error()); return }
@@ -534,7 +545,7 @@ func GitDeploy(w http.ResponseWriter, r *http.Request) {
 
 // Node tasks
 func NodeTasks(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id := resolveNodeID(chi.URLParam(r, "id"))
 	tasks, _ := docker.Tasks()
 	nodes, _ := docker.Nodes()
 	svcs, _ := docker.Services()
