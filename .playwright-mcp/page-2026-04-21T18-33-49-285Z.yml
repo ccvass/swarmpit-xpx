@@ -1,0 +1,67 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: https://github.com/ccvass/swarmpit-xpx
+        - img [ref=e8]
+      - button [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]:
+          - img [ref=e15]
+          - img [ref=e19]
+  - navigation:
+    - generic [ref=e22]:
+      - link [ref=e25] [cursor=pointer]:
+        - /url: https://github.com/ccvass/swarmpit-xpx
+        - img [ref=e26]
+      - generic [ref=e27]:
+        - link "Dashboard" [ref=e28] [cursor=pointer]:
+          - /url: "#/"
+          - img [ref=e30]
+          - heading "Dashboard" [level=6] [ref=e33]
+        - link "Registries" [ref=e34] [cursor=pointer]:
+          - /url: "#/registries"
+          - img [ref=e36]
+          - heading "Registries" [level=6] [ref=e39]
+        - listitem [ref=e40]:
+          - generic [ref=e41]: APPLICATIONS
+        - link "Stacks" [ref=e42] [cursor=pointer]:
+          - /url: "#/stacks"
+          - img [ref=e44]
+          - heading "Stacks" [level=6] [ref=e47]
+        - link "Services" [ref=e48] [cursor=pointer]:
+          - /url: "#/services"
+          - img [ref=e50]
+          - heading "Services" [level=6] [ref=e53]
+        - link "Tasks" [ref=e54] [cursor=pointer]:
+          - /url: "#/tasks"
+          - img [ref=e56]
+          - heading "Tasks" [level=6] [ref=e59]
+        - listitem [ref=e60]:
+          - generic [ref=e61]: INFRASTRUCTURE
+        - link "Networks" [ref=e62] [cursor=pointer]:
+          - /url: "#/networks"
+          - img [ref=e64]
+          - heading "Networks" [level=6] [ref=e67]
+        - link "Nodes" [ref=e68] [cursor=pointer]:
+          - /url: "#/nodes"
+          - img [ref=e70]
+          - heading "Nodes" [level=6] [ref=e73]
+        - listitem [ref=e74]:
+          - generic [ref=e75]: DATA
+        - link "Volumes" [ref=e76] [cursor=pointer]:
+          - /url: "#/volumes"
+          - img [ref=e78]
+          - heading "Volumes" [level=6] [ref=e81]
+        - link "Secrets" [ref=e82] [cursor=pointer]:
+          - /url: "#/secrets"
+          - img [ref=e84]
+          - heading "Secrets" [level=6] [ref=e87]
+      - generic [ref=e89]:
+        - separator [ref=e90]
+        - link "Swagger API" [ref=e92] [cursor=pointer]:
+          - /url: /api-docs
+          - heading "Swagger API" [level=6] [ref=e94]
+          - img [ref=e96]
+  - main [ref=e98]:
+    - progressbar [ref=e103]:
+      - img [ref=e104]

@@ -1,0 +1,78 @@
+- generic [ref=e127]:
+  - banner [ref=e128]:
+    - generic [ref=e129]:
+      - link "swarmpit-xpx" [ref=e131] [cursor=pointer]:
+        - /url: https://github.com/ccvass/swarmpit-xpx
+        - generic [ref=e132]:
+          - img [ref=e133]
+          - generic [ref=e134]: swarmpit-xpx
+      - button "a" [ref=e136] [cursor=pointer]:
+        - generic [ref=e137]:
+          - generic [ref=e140]: a
+          - img [ref=e143]
+  - navigation:
+    - generic [ref=e146]:
+      - link "swarmpit-xpx" [ref=e149] [cursor=pointer]:
+        - /url: https://github.com/ccvass/swarmpit-xpx
+        - generic [ref=e150]:
+          - img [ref=e151]
+          - generic [ref=e152]: swarmpit-xpx
+      - generic [ref=e153]:
+        - link "Dashboard" [ref=e154] [cursor=pointer]:
+          - /url: "#/"
+          - img [ref=e156]
+          - heading "Dashboard" [level=6] [ref=e159]
+        - link "Registries" [ref=e160] [cursor=pointer]:
+          - /url: "#/registries"
+          - img [ref=e162]
+          - heading "Registries" [level=6] [ref=e165]
+        - listitem [ref=e166]:
+          - generic [ref=e167]: APPLICATIONS
+        - link "Stacks" [ref=e168] [cursor=pointer]:
+          - /url: "#/stacks"
+          - img [ref=e170]
+          - heading "Stacks" [level=6] [ref=e173]
+        - link "Services" [ref=e174] [cursor=pointer]:
+          - /url: "#/services"
+          - img [ref=e176]
+          - heading "Services" [level=6] [ref=e179]
+        - link "Tasks" [ref=e180] [cursor=pointer]:
+          - /url: "#/tasks"
+          - img [ref=e182]
+          - heading "Tasks" [level=6] [ref=e185]
+        - listitem [ref=e186]:
+          - generic [ref=e187]: INFRASTRUCTURE
+        - link "Networks" [ref=e188] [cursor=pointer]:
+          - /url: "#/networks"
+          - img [ref=e190]
+          - heading "Networks" [level=6] [ref=e193]
+        - link "Nodes" [ref=e194] [cursor=pointer]:
+          - /url: "#/nodes"
+          - img [ref=e196]
+          - heading "Nodes" [level=6] [ref=e199]
+        - listitem [ref=e200]:
+          - generic [ref=e201]: DATA
+        - link "Volumes" [ref=e202] [cursor=pointer]:
+          - /url: "#/volumes"
+          - img [ref=e204]
+          - heading "Volumes" [level=6] [ref=e207]
+        - link "Secrets" [ref=e208] [cursor=pointer]:
+          - /url: "#/secrets"
+          - img [ref=e210]
+          - heading "Secrets" [level=6] [ref=e213]
+        - link "Configs" [ref=e214] [cursor=pointer]:
+          - /url: "#/configs"
+          - img [ref=e216]
+          - heading "Configs" [level=6] [ref=e219]
+      - generic [ref=e221]:
+        - separator [ref=e222]
+        - generic [ref=e223]:
+          - generic [ref=e224]: swarmpit-xpx 2.2.0
+          - generic [ref=e225]: engine 28.5.1 API 1.51
+        - link "Swagger API" [ref=e226] [cursor=pointer]:
+          - /url: /api-docs
+          - heading "Swagger API" [level=6] [ref=e228]
+          - img [ref=e230]
+  - main [ref=e232]:
+    - progressbar [ref=e237]:
+      - img [ref=e238]
