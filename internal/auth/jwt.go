@@ -60,11 +60,13 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := r.Header.Get("Authorization")
 		if token == "" {
+			w.Header().Set("X-Backend-Server", "swarmpit")
 			http.Error(w, `{"error":"Authentication failed"}`, http.StatusUnauthorized)
 			return
 		}
 		claims, err := ValidateJWT(token)
 		if err != nil {
+			w.Header().Set("X-Backend-Server", "swarmpit")
 			http.Error(w, `{"error":"Token invalid"}`, http.StatusUnauthorized)
 			return
 		}
