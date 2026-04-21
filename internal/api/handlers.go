@@ -195,6 +195,104 @@ func StackInfo(w http.ResponseWriter, r *http.Request) {
 	json200(w, mapStack(name, svcs, tasks, nets, info))
 }
 
+func StackServices(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
+	tasks, _ := docker.Tasks()
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
+	var result []map[string]any
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			result = append(result, mapService(s, tasks, nets, info))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackTasks(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	tasks, _ := docker.Tasks()
+	svcs, _ := docker.Services()
+	nodes, _ := docker.Nodes()
+	info, _ := docker.Info()
+	svcIDs := map[string]bool{}
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			svcIDs[s.ID] = true
+		}
+	}
+	var result []map[string]any
+	for _, t := range tasks {
+		if svcIDs[t.ServiceID] {
+			result = append(result, mapTask(t, nodes, svcs, info))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackNetworks(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	nets, _ := docker.Networks()
+	var result []map[string]any
+	for _, n := range nets {
+		if n.Labels["com.docker.stack.namespace"] == name {
+			result = append(result, mapNetwork(n))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackVolumes(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	vols, _ := docker.Volumes()
+	var result []map[string]any
+	for _, v := range vols.Volumes {
+		if v.Labels["com.docker.stack.namespace"] == name {
+			result = append(result, mapVolume(v))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackConfigs(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	configs, _ := docker.Configs()
+	var result []map[string]any
+	for _, c := range configs {
+		if c.Spec.Labels["com.docker.stack.namespace"] == name {
+			result = append(result, mapConfig(c))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackSecrets(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	secrets, _ := docker.Secrets()
+	var result []map[string]any
+	for _, s := range secrets {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			result = append(result, mapSecret(s))
+		}
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+func StackFile(w http.ResponseWriter, r *http.Request) {
+	json200(w, map[string]any{"name": chi.URLParam(r, "name"), "spec": ""})
+}
+
+func StackCompose(w http.ResponseWriter, r *http.Request) {
+	json200(w, map[string]string{"compose": ""})
+}
+
 
 // Stats returns cluster resource stats (CPU, memory, disk from node resources)
 func Stats(w http.ResponseWriter, r *http.Request) {
