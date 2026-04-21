@@ -31,7 +31,7 @@ func Version(w http.ResponseWriter, r *http.Request) {
 		apiVer = v
 	}
 	json200(w, map[string]any{
-		"name": "swarmpit", "version": "2.0.0-go", "revision": nil,
+		"name": "swarmpit-xpx", "version": "2.2.0", "revision": nil,
 		"initialized": store.AdminExists(), "statistics": true, "instanceName": nil,
 		"docker": map[string]any{"api": apiVer, "engine": ver.Version},
 	})
