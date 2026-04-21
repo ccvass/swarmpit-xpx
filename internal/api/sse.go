@@ -72,13 +72,18 @@ var agentStatsCache = struct {
 }{nodes: make(map[string]map[string]any)}
 
 func storeAgentStats(event map[string]any) {
-	// Agent sends: {"id": "nodeId", "cpu": {...}, "memory": {...}, "disk": {...}, ...}
-	id, ok := event["id"].(string)
+	// Agent sends: {"type": "stats", "message": {"id": "nodeId", "cpu": {...}, "memory": {...}, "disk": {...}}}
+	// Or directly: {"id": "nodeId", "cpu": {...}, ...}
+	msg := event
+	if m, ok := event["message"].(map[string]any); ok {
+		msg = m
+	}
+	id, ok := msg["id"].(string)
 	if !ok || id == "" {
 		return
 	}
 	agentStatsCache.Lock()
-	agentStatsCache.nodes[id] = event
+	agentStatsCache.nodes[id] = msg
 	agentStatsCache.Unlock()
 }
 
