@@ -6,8 +6,13 @@
             [clojure.tools.logging :as log])
   (:import [java.util UUID]))
 
+(def ^:private ds-atom (atom nil))
+
 (defn- ds []
-  (jdbc/get-datasource {:dbtype "sqlite" :dbname (str (config :db-path) "/swarmpit.db")}))
+  (or @ds-atom
+      (let [d (jdbc/get-datasource {:dbtype "sqlite" :dbname (str (config :db-path) "/swarmpit.db")})]
+        (reset! ds-atom d)
+        d)))
 
 (defn init-schema! []
   (jdbc/execute-one! (ds)

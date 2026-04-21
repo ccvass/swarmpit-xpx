@@ -1153,6 +1153,8 @@
     (when yaml
       (str/replace yaml "$" "$$"))))
 
+(def stack-compose-memo (memo/ttl stack-compose :ttl/threshold 30000))
+
 (defn service-compose
   [service-name]
   (some->> [(service service-name)]

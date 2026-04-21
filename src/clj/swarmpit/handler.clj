@@ -784,7 +784,7 @@
 (defn stack-file
   [{{:keys [path]} :parameters}]
   (let [response (or (api/stackfile (:name path))
-                     (when-let [spec (api/stack-compose (:name path))]
+                     (when-let [spec (api/stack-compose-memo (:name path))]
                        {:name (:name path) :spec spec}))]
     (if (some? response)
       (resp-ok response)
