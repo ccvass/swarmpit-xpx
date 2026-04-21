@@ -109,14 +109,13 @@ func ServiceList(w http.ResponseWriter, r *http.Request) {
 
 func ServiceInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	// Docker SDK accepts both full ID and service name
 	svc, err := docker.Service(id)
 	if err != nil {
-		// Try finding by short ID prefix in the list
+		// Docker SDK accepts name too, but try listing if it fails
 		svcs, _ := docker.Services()
 		found := false
 		for _, s := range svcs {
-			if strings.HasPrefix(s.ID, id) {
+			if strings.HasPrefix(s.ID, id) || s.Spec.Name == id {
 				svc = s
 				found = true
 				break
@@ -374,14 +373,22 @@ func NodeTimeseries(w http.ResponseWriter, r *http.Request) {
 // ServiceTaskList returns tasks for a specific service
 func ServiceTaskList(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	// Resolve name to ID if needed
+	svcs, _ := docker.Services()
+	resolvedID := id
+	for _, s := range svcs {
+		if s.Spec.Name == id || strings.HasPrefix(s.ID, id) {
+			resolvedID = s.ID
+			break
+		}
+	}
 	tasks, err := docker.Tasks()
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	nodes, _ := docker.Nodes()
-	svcs, _ := docker.Services()
 	info, _ := docker.Info()
 	var result []map[string]any
 	for _, t := range tasks {
-		if t.ServiceID == id || strings.HasPrefix(t.ServiceID, id) {
+		if t.ServiceID == resolvedID {
 			result = append(result, mapTask(t, nodes, svcs, info))
 		}
 	}
@@ -457,8 +464,16 @@ func ConfigInfo(w http.ResponseWriter, r *http.Request) {
 	jsonErr(w, 404, "Config not found")
 }
 
+func resolveServiceID(id string) string {
+	svcs, _ := docker.Services()
+	for _, s := range svcs {
+		if s.Spec.Name == id || strings.HasPrefix(s.ID, id) { return s.ID }
+	}
+	return id
+}
+
 func ServiceLogs(w http.ResponseWriter, r *http.Request) {
-	logs, err := docker.ServiceLogs(chi.URLParam(r, "id"), r.URL.Query().Get("tail"))
+	logs, err := docker.ServiceLogs(resolveServiceID(chi.URLParam(r, "id")), r.URL.Query().Get("tail"))
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	json200(w, map[string]string{"logs": logs})
 }
