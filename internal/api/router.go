@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
 	"github.com/go-chi/chi/v5"
@@ -15,8 +16,11 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
-	// Read index.html once for SPA fallback
-	indexHTML, _ := fs.ReadFile(staticFS, "index.html")
+	// Read index.html and inject CSS/JS tags
+	rawIndex, _ := fs.ReadFile(staticFS, "index.html")
+	idx := strings.Replace(string(rawIndex), "</head>", `<link rel="stylesheet" href="/css/main.css"></head>`, 1)
+	idx = strings.Replace(idx, "</body>", `<script src="/js/main.js"></script></body>`, 1)
+	indexHTML := []byte(idx)
 
 	// Public
 	r.Get("/version", Version)
