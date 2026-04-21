@@ -88,28 +88,48 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 }
 
 func broadcastDashboard() {
-	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
 	nodes, _ := docker.Nodes()
 	svcs, _ := docker.Services()
 	tasks, _ := docker.Tasks()
 	nets, _ := docker.Networks()
 	info, _ := docker.Info()
+	cache := getNodeStatsCache()
 	totalCPU := 0.0
 	totalMem := int64(0)
 	resources := map[string]map[string]any{}
-	for _, n := range nodes {
-		if n.Status.State != "ready" { continue }
-		cpu := float64(n.Description.Resources.NanoCPUs) / 1e9
-		mem := n.Description.Resources.MemoryBytes
+	cpuSum, memSum, diskSum := 0.0, 0.0, 0.0
+	memUsed, diskUsed, diskTotal := int64(0), int64(0), int64(0)
+	nc := 0
+	for _, nd := range nodes {
+		if nd.Status.State != "ready" { continue }
+		cpu := float64(nd.Description.Resources.NanoCPUs) / 1e9
+		mem := nd.Description.Resources.MemoryBytes
 		totalCPU += cpu
 		totalMem += mem
-		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
+		resources[nd.ID] = map[string]any{"cores": cpu, "memory": mem}
+		if s, ok := cache[nd.ID]; ok {
+			nc++
+			if c, ok := s["cpu"].(map[string]any); ok {
+				if v, ok := c["usedPercentage"].(float64); ok { cpuSum += v }
+			}
+			if m, ok := s["memory"].(map[string]any); ok {
+				if v, ok := m["usedPercentage"].(float64); ok { memSum += v }
+				if v, ok := m["used"].(float64); ok { memUsed += int64(v) }
+			}
+			if d, ok := s["disk"].(map[string]any); ok {
+				if v, ok := d["usedPercentage"].(float64); ok { diskSum += v }
+				if v, ok := d["used"].(float64); ok { diskUsed += int64(v) }
+				if v, ok := d["total"].(float64); ok { diskTotal += int64(v) }
+			}
+		}
 	}
+	cpuAvg, memAvg, diskAvg := 0.0, 0.0, 0.0
+	if nc > 0 { cpuAvg = cpuSum / float64(nc); memAvg = memSum / float64(nc); diskAvg = diskSum / float64(nc) }
 	stats := map[string]any{
 		"resources": resources,
-		"cpu":    map[string]any{"usage": cpuU, "cores": totalCPU},
-		"memory": map[string]any{"usage": memU, "used": memUsed, "total": totalMem},
-		"disk":   map[string]any{"usage": diskU, "used": diskUsed, "total": diskTotal},
+		"cpu":    map[string]any{"usage": cpuAvg, "cores": totalCPU},
+		"memory": map[string]any{"usage": memAvg, "used": memUsed, "total": totalMem},
+		"disk":   map[string]any{"usage": diskAvg, "used": diskUsed, "total": diskTotal},
 	}
 	Broadcast(map[string]any{
 		"stats":              stats,
