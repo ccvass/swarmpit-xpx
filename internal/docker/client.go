@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -16,87 +17,146 @@ var cli *client.Client
 func Init() error {
 	var err error
 	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	return err
+	if err != nil {
+		return fmt.Errorf("docker client init: %w", err)
+	}
+	return nil
 }
 
-func ctx() (context.Context, context.CancelFunc) {
+func withTimeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 15*time.Second)
 }
 
 func Ping() (types.Ping, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.Ping(c)
+	p, err := cli.Ping(ctx)
+	if err != nil {
+		return p, fmt.Errorf("docker ping: %w", err)
+	}
+	return p, nil
 }
 
 func Info() (system.Info, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.Info(c)
+	info, err := cli.Info(ctx)
+	if err != nil {
+		return info, fmt.Errorf("docker info: %w", err)
+	}
+	return info, nil
+}
+
+func Version() (types.Version, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	v, err := cli.ServerVersion(ctx)
+	if err != nil {
+		return v, fmt.Errorf("docker version: %w", err)
+	}
+	return v, nil
 }
 
 func Nodes() ([]swarm.Node, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.NodeList(c, types.NodeListOptions{})
+	n, err := cli.NodeList(ctx, types.NodeListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	return n, nil
 }
 
 func Node(id string) (swarm.Node, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	node, _, err := cli.NodeInspectWithRaw(c, id)
-	return node, err
+	n, _, err := cli.NodeInspectWithRaw(ctx, id)
+	if err != nil {
+		return n, fmt.Errorf("inspect node %s: %w", id, err)
+	}
+	return n, nil
 }
 
 func Services() ([]swarm.Service, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.ServiceList(c, types.ServiceListOptions{})
+	s, err := cli.ServiceList(ctx, types.ServiceListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list services: %w", err)
+	}
+	return s, nil
 }
 
 func Service(id string) (swarm.Service, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	svc, _, err := cli.ServiceInspectWithRaw(c, id, types.ServiceInspectOptions{})
-	return svc, err
+	s, _, err := cli.ServiceInspectWithRaw(ctx, id, types.ServiceInspectOptions{})
+	if err != nil {
+		return s, fmt.Errorf("inspect service %s: %w", id, err)
+	}
+	return s, nil
 }
 
 func Tasks() ([]swarm.Task, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.TaskList(c, types.TaskListOptions{})
+	t, err := cli.TaskList(ctx, types.TaskListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list tasks: %w", err)
+	}
+	return t, nil
 }
 
 func ServiceTasks(serviceID string, running bool) ([]swarm.Task, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
 	f := filters.NewArgs(filters.Arg("service", serviceID))
 	if running {
 		f.Add("desired-state", "running")
 	}
-	return cli.TaskList(c, types.TaskListOptions{Filters: f})
+	t, err := cli.TaskList(ctx, types.TaskListOptions{Filters: f})
+	if err != nil {
+		return nil, fmt.Errorf("list tasks for service %s: %w", serviceID, err)
+	}
+	return t, nil
 }
 
 func Networks() ([]types.NetworkResource, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.NetworkList(c, types.NetworkListOptions{})
+	n, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list networks: %w", err)
+	}
+	return n, nil
 }
 
 func Secrets() ([]swarm.Secret, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.SecretList(c, types.SecretListOptions{})
+	s, err := cli.SecretList(ctx, types.SecretListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list secrets: %w", err)
+	}
+	return s, nil
 }
 
 func Configs() ([]swarm.Config, error) {
-	c, cancel := ctx()
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.ConfigList(c, types.ConfigListOptions{})
+	c, err := cli.ConfigList(ctx, types.ConfigListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list configs: %w", err)
+	}
+	return c, nil
 }
 
-func Version() (types.Version, error) {
-	c, cancel := ctx()
+func UpdateService(id string, version swarm.Version, spec swarm.ServiceSpec) error {
+	ctx, cancel := withTimeout()
 	defer cancel()
-	return cli.ServerVersion(c)
+	_, err := cli.ServiceUpdate(ctx, id, version, spec, types.ServiceUpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update service %s: %w", id, err)
+	}
+	return nil
 }

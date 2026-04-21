@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -11,31 +11,31 @@ import (
 )
 
 func main() {
-	log.Println("Swarmpit XPX starting...")
+	slog.Info("swarmpit starting")
 
-	// Database
 	dbPath := envOr("SWARMPIT_DB_PATH", "./data")
 	if err := store.Init(dbPath); err != nil {
-		log.Fatal("Database init failed:", err)
+		slog.Error("database init failed", "err", err)
+		os.Exit(1)
 	}
-	log.Println("SQLite ready at", dbPath)
+	slog.Info("sqlite ready", "path", dbPath)
 
-	// Docker
 	if err := docker.Init(); err != nil {
-		log.Fatal("Docker init failed:", err)
+		slog.Error("docker init failed", "err", err)
+		os.Exit(1)
 	}
 	ping, _ := docker.Ping()
-	log.Println("Docker API:", ping.APIVersion)
+	slog.Info("docker connected", "api", ping.APIVersion)
 
-	// Static files
 	publicDir := envOr("SWARMPIT_PUBLIC_DIR", "resources/public")
-	staticFS := os.DirFS(publicDir)
-
-	// Server
 	port := envOr("PORT", "8080")
-	router := api.NewRouter(staticFS)
-	log.Println("Swarmpit running on port", port)
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	router := api.NewRouter(os.DirFS(publicDir))
+
+	slog.Info("swarmpit running", "port", port)
+	if err := http.ListenAndServe(":"+port, router); err != nil {
+		slog.Error("server failed", "err", err)
+		os.Exit(1)
+	}
 }
 
 func envOr(key, fallback string) string {

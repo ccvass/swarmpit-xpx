@@ -14,15 +14,17 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
-	// Public endpoints
+	// Public
 	r.Get("/version", Version)
 	r.Get("/health/live", HealthLive)
 	r.Get("/health/ready", HealthReady)
 	r.Post("/login", Login)
 	r.Post("/initialize", Initialize)
 	r.Post("/api/webhooks/{token}", WebhookTrigger)
+	r.Get("/events", SSEHandler)
+	r.Post("/events", EventPush)
 
-	// Authenticated API
+	// Authenticated
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware)
 
@@ -34,25 +36,27 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Get("/api/networks", NetworkList)
 		r.Get("/api/secrets", SecretList)
 		r.Get("/api/configs", ConfigList)
+		r.Get("/api/stacks", StackList)
+		r.Get("/api/stacks/{name}", StackInfo)
+		r.Post("/api/stacks/git", GitDeploy)
+		r.Get("/exec/{id}", ExecHandler)
 
-		// Admin only
+		// Admin
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)
 			r.Get("/api/audit", AuditList)
 		})
 	})
 
-	// Static files + SPA fallback
+	// Static + SPA fallback
 	fileServer := http.FileServer(http.FS(staticFS))
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		// Try static file first
 		f, err := staticFS.Open(r.URL.Path[1:])
 		if err == nil {
 			f.Close()
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		// SPA fallback — serve index.html
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})
