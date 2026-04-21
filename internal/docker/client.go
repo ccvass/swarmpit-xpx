@@ -1,0 +1,214 @@
+package docker
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/api/types/system"
+	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/client"
+)
+
+var cli *client.Client
+
+func Init() error {
+	var err error
+	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("docker client init: %w", err)
+	}
+	return nil
+}
+
+func withTimeout() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 15*time.Second)
+}
+
+func Ping() (types.Ping, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	p, err := cli.Ping(ctx)
+	if err != nil {
+		return p, fmt.Errorf("docker ping: %w", err)
+	}
+	return p, nil
+}
+
+func Info() (system.Info, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	info, err := cli.Info(ctx)
+	if err != nil {
+		return info, fmt.Errorf("docker info: %w", err)
+	}
+	return info, nil
+}
+
+func Version() (types.Version, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	v, err := cli.ServerVersion(ctx)
+	if err != nil {
+		return v, fmt.Errorf("docker version: %w", err)
+	}
+	return v, nil
+}
+
+func Nodes() ([]swarm.Node, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	n, err := cli.NodeList(ctx, types.NodeListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	return n, nil
+}
+
+func Node(id string) (swarm.Node, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	n, _, err := cli.NodeInspectWithRaw(ctx, id)
+	if err != nil {
+		return n, fmt.Errorf("inspect node %s: %w", id, err)
+	}
+	return n, nil
+}
+
+func Services() ([]swarm.Service, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	s, err := cli.ServiceList(ctx, types.ServiceListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list services: %w", err)
+	}
+	return s, nil
+}
+
+func Service(id string) (swarm.Service, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	s, _, err := cli.ServiceInspectWithRaw(ctx, id, types.ServiceInspectOptions{})
+	if err != nil {
+		return s, fmt.Errorf("inspect service %s: %w", id, err)
+	}
+	return s, nil
+}
+
+func Tasks() ([]swarm.Task, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	t, err := cli.TaskList(ctx, types.TaskListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list tasks: %w", err)
+	}
+	return t, nil
+}
+
+func ServiceTasks(serviceID string, running bool) ([]swarm.Task, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	f := filters.NewArgs(filters.Arg("service", serviceID))
+	if running {
+		f.Add("desired-state", "running")
+	}
+	t, err := cli.TaskList(ctx, types.TaskListOptions{Filters: f})
+	if err != nil {
+		return nil, fmt.Errorf("list tasks for service %s: %w", serviceID, err)
+	}
+	return t, nil
+}
+
+func Networks() ([]types.NetworkResource, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	n, err := cli.NetworkList(ctx, types.NetworkListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list networks: %w", err)
+	}
+	return n, nil
+}
+
+func Secrets() ([]swarm.Secret, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	s, err := cli.SecretList(ctx, types.SecretListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list secrets: %w", err)
+	}
+	return s, nil
+}
+
+func Configs() ([]swarm.Config, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	c, err := cli.ConfigList(ctx, types.ConfigListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list configs: %w", err)
+	}
+	return c, nil
+}
+
+func UpdateService(id string, version swarm.Version, spec swarm.ServiceSpec) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	_, err := cli.ServiceUpdate(ctx, id, version, spec, types.ServiceUpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update service %s: %w", id, err)
+	}
+	return nil
+}
+
+func Volumes() (volume.ListResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	v, err := cli.VolumeList(ctx, volume.ListOptions{})
+	if err != nil {
+		return v, fmt.Errorf("list volumes: %w", err)
+	}
+	return v, nil
+}
+
+func ServiceLogs(id string, tail string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if tail == "" {
+		tail = "100"
+	}
+	reader, err := cli.ServiceLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Tail: tail, Timestamps: true})
+	if err != nil {
+		return "", fmt.Errorf("service logs %s: %w", id, err)
+	}
+	defer reader.Close()
+	buf := make([]byte, 1024*1024)
+	n, _ := reader.Read(buf)
+	return string(buf[:n]), nil
+}
+
+func DeleteService(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ServiceRemove(ctx, id)
+}
+
+func DeleteSecret(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.SecretRemove(ctx, id)
+}
+
+func DeleteConfig(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ConfigRemove(ctx, id)
+}
+
+func DeleteNetwork(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.NetworkRemove(ctx, id)
+}
