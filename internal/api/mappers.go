@@ -64,6 +64,10 @@ func mapService(s swarm.Service, tasks []swarm.Task) map[string]any {
 		replicas = int(*spec.Mode.Replicated.Replicas)
 	}
 	stack := spec.Labels["com.docker.stack.namespace"]
+	var stackVal any
+	if stack != "" {
+		stackVal = stack
+	}
 	running, total := 0, 0
 	for _, t := range tasks {
 		if t.ServiceID == s.ID {
@@ -144,6 +148,13 @@ func mapService(s swarm.Service, tasks []swarm.Task) map[string]any {
 		updateStatus = string(s.UpdateStatus.State)
 		updateMsg = s.UpdateStatus.Message
 	}
+	var updateStatusVal, updateMsgVal any
+	if updateStatus != "" {
+		updateStatusVal = updateStatus
+	}
+	if updateMsg != "" {
+		updateMsgVal = updateMsg
+	}
 	agent := spec.Labels["swarmpit.agent"] == "true"
 	immutable := spec.Labels["swarmpit.service.immutable"] == "true"
 	var agentVal, immutableVal any
@@ -170,10 +181,10 @@ func mapService(s swarm.Service, tasks []swarm.Task) map[string]any {
 	}
 	return map[string]any{
 		"id": s.ID, "version": s.Version.Index, "createdAt": s.CreatedAt, "updatedAt": s.UpdatedAt,
-		"serviceName": spec.Name, "mode": mode, "stack": stack, "replicas": replicas, "state": state,
+		"serviceName": spec.Name, "mode": mode, "stack": stackVal, "replicas": replicas, "state": state,
 		"agent": agentVal, "immutable": immutableVal, "links": []any{},
 		"repository": map[string]string{"name": name, "tag": tag, "image": name + ":" + tag, "imageDigest": digest},
-		"status":          map[string]any{"tasks": map[string]int{"running": running, "total": total}, "update": updateStatus, "message": updateMsg},
+		"status":          map[string]any{"tasks": map[string]int{"running": running, "total": total}, "update": updateStatusVal, "message": updateMsgVal},
 		"ports": ports, "mounts": mounts, "networks": networks, "secrets": secrets, "configs": configs,
 		"hosts": hosts, "variables": variables, "labels": labels, "containerLabels": containerLabels,
 		"command": cs.Args, "entrypoint": cs.Command, "hostname": cs.Hostname, "isolation": nil, "sysctls": nil,
