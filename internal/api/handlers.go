@@ -176,6 +176,74 @@ func StackInfo(w http.ResponseWriter, r *http.Request) {
 	json200(w, mapStack(name, svcs, tasks, nets, info))
 }
 
+func TaskInfo(w http.ResponseWriter, r *http.Request) {
+	tasks, err := docker.Tasks()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	nodes, _ := docker.Nodes()
+	svcs, _ := docker.Services()
+	info, _ := docker.Info()
+	id := chi.URLParam(r, "id")
+	for _, t := range tasks {
+		if t.ID == id {
+			json200(w, mapTask(t, nodes, svcs, info))
+			return
+		}
+	}
+	jsonErr(w, 404, "Task not found")
+}
+
+func NetworkInfo(w http.ResponseWriter, r *http.Request) {
+	nets, err := docker.Networks()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	id := chi.URLParam(r, "id")
+	for _, n := range nets {
+		if n.ID == id {
+			json200(w, mapNetwork(n))
+			return
+		}
+	}
+	jsonErr(w, 404, "Network not found")
+}
+
+func VolumeInfo(w http.ResponseWriter, r *http.Request) {
+	vols, err := docker.Volumes()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	id := chi.URLParam(r, "id")
+	for _, v := range vols.Volumes {
+		if v.Name == id {
+			json200(w, mapVolume(v))
+			return
+		}
+	}
+	jsonErr(w, 404, "Volume not found")
+}
+
+func SecretInfo(w http.ResponseWriter, r *http.Request) {
+	secrets, err := docker.Secrets()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	id := chi.URLParam(r, "id")
+	for _, s := range secrets {
+		if s.ID == id {
+			json200(w, mapSecret(s))
+			return
+		}
+	}
+	jsonErr(w, 404, "Secret not found")
+}
+
+func ConfigInfo(w http.ResponseWriter, r *http.Request) {
+	configs, err := docker.Configs()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	id := chi.URLParam(r, "id")
+	for _, c := range configs {
+		if c.ID == id {
+			json200(w, mapConfig(c))
+			return
+		}
+	}
+	jsonErr(w, 404, "Config not found")
+}
+
 func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 	logs, err := docker.ServiceLogs(chi.URLParam(r, "id"), r.URL.Query().Get("tail"))
 	if err != nil { jsonErr(w, 500, err.Error()); return }
