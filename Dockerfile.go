@@ -103,6 +103,13 @@ RUN sed -i \
 COPY resources/public/img/logo.svg /app/public/img/logo.svg
 COPY resources/public/img/icon.svg /app/public/img/icon.svg
 
+# Cache-bust: rename logo/icon with version hash and update references in JS
+RUN HASH=$(md5sum /app/public/img/logo.svg | cut -c1-8) && \
+    cp /app/public/img/logo.svg /app/public/img/logo.${HASH}.svg && \
+    cp /app/public/img/icon.svg /app/public/img/icon.${HASH}.svg && \
+    sed -i "s|img/logo\.svg|img/logo.${HASH}.svg|g" /app/public/js/main.js /app/public/index.html && \
+    sed -i "s|img/icon\.svg|img/icon.${HASH}.svg|g" /app/public/js/main.js /app/public/index.html
+
 # Replace branding text in compiled JS
 RUN sed -i \
     -e 's/swarmpit\.io/swarmpit-xpx/g' \
