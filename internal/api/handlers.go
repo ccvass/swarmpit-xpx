@@ -100,14 +100,18 @@ func ServiceList(w http.ResponseWriter, r *http.Request) {
 	svcs, err := docker.Services()
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	tasks, _ := docker.Tasks()
-	json200(w, mapServices(svcs, tasks))
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
+	json200(w, mapServices(svcs, tasks, nets, info))
 }
 
 func ServiceInfo(w http.ResponseWriter, r *http.Request) {
 	svc, err := docker.Service(chi.URLParam(r, "id"))
 	if err != nil { jsonErr(w, 404, err.Error()); return }
 	tasks, _ := docker.Tasks()
-	json200(w, mapService(svc, tasks))
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
+	json200(w, mapService(svc, tasks, nets, info))
 }
 
 func TaskList(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +119,8 @@ func TaskList(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	nodes, _ := docker.Nodes()
 	svcs, _ := docker.Services()
-	json200(w, mapTasks(tasks, nodes, svcs))
+	info, _ := docker.Info()
+	json200(w, mapTasks(tasks, nodes, svcs, info))
 }
 
 func NetworkList(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +151,8 @@ func StackList(w http.ResponseWriter, r *http.Request) {
 	svcs, err := docker.Services()
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	tasks, _ := docker.Tasks()
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
 	stacks := map[string]bool{}
 	for _, s := range svcs {
 		ns := s.Spec.Labels["com.docker.stack.namespace"]
@@ -155,7 +162,7 @@ func StackList(w http.ResponseWriter, r *http.Request) {
 	}
 	result := []map[string]any{}
 	for name := range stacks {
-		result = append(result, mapStack(name, svcs, tasks))
+		result = append(result, mapStack(name, svcs, tasks, nets, info))
 	}
 	json200(w, result)
 }
@@ -164,7 +171,9 @@ func StackInfo(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	svcs, _ := docker.Services()
 	tasks, _ := docker.Tasks()
-	json200(w, mapStack(name, svcs, tasks))
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
+	json200(w, mapStack(name, svcs, tasks, nets, info))
 }
 
 func ServiceLogs(w http.ResponseWriter, r *http.Request) {
