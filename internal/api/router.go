@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"io/fs"
 	"net/http"
 
@@ -13,6 +14,9 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
+
+	// Read index.html once for SPA fallback
+	indexHTML, _ := fs.ReadFile(staticFS, "index.html")
 
 	// Public
 	r.Get("/version", Version)
@@ -41,29 +45,42 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Post("/api/stacks/git", GitDeploy)
 		r.Get("/exec/{id}", ExecHandler)
 
-		// Admin
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)
 			r.Get("/api/audit", AuditList)
 		})
 	})
 
-	// Static + SPA fallback
-	fileServer := http.FileServer(http.FS(staticFS))
+	// Static files + SPA fallback
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path[1:] // strip leading /
+		path := r.URL.Path[1:]
 		if path == "" {
-			path = "index.html"
-		}
-		f, err := staticFS.Open(path)
-		if err == nil {
-			f.Close()
-			fileServer.ServeHTTP(w, r)
+			w.Header().Set("Content-Type", "text/html")
+			w.Write(indexHTML)
 			return
 		}
-		// SPA fallback — serve index.html
-		r.URL.Path = "/index.html"
-		fileServer.ServeHTTP(w, r)
+		f, err := staticFS.Open(path)
+		if err != nil {
+			// SPA fallback
+			w.Header().Set("Content-Type", "text/html")
+			w.Write(indexHTML)
+			return
+		}
+		defer f.Close()
+		stat, _ := f.Stat()
+		if stat.IsDir() {
+			w.Header().Set("Content-Type", "text/html")
+			w.Write(indexHTML)
+			return
+		}
+		// Serve the static file
+		rs, ok := f.(io.ReadSeeker)
+		if ok {
+			http.ServeContent(w, r, path, stat.ModTime(), rs)
+		} else {
+			data, _ := io.ReadAll(f)
+			w.Write(data)
+		}
 	})
 
 	return r
