@@ -36,8 +36,19 @@ func appendPoint(buf []tsPoint, p tsPoint) []tsPoint {
 }
 
 // Called from storeAgentStats when agent sends node+task stats
-func recordTimeseries(nodeID string, event map[string]any) {
+func recordTimeseries(agentID string, event map[string]any) {
 	now := time.Now().Unix()
+
+	// Resolve agent container ID to node ID by checking running agent tasks
+	nodeID := agentID
+	tasks, _ := docker.Tasks()
+	for _, t := range tasks {
+		if t.Status.ContainerStatus != nil && t.Status.ContainerStatus.ContainerID == agentID {
+			nodeID = t.NodeID
+			break
+		}
+	}
+
 	tsStore.Lock()
 	defer tsStore.Unlock()
 
