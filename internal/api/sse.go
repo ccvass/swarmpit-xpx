@@ -90,6 +90,10 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 func broadcastDashboard() {
 	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
 	nodes, _ := docker.Nodes()
+	svcs, _ := docker.Services()
+	tasks, _ := docker.Tasks()
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
 	totalCPU := 0.0
 	totalMem := int64(0)
 	resources := map[string]map[string]any{}
@@ -107,7 +111,14 @@ func broadcastDashboard() {
 		"memory": map[string]any{"usage": memU, "used": memUsed, "total": totalMem},
 		"disk":   map[string]any{"usage": diskU, "used": diskUsed, "total": diskTotal},
 	}
-	Broadcast(map[string]any{"stats": stats})
+	Broadcast(map[string]any{
+		"stats":              stats,
+		"services":           mapServices(svcs, tasks, nets, info),
+		"nodes":              mapNodes(nodes),
+		"nodes-ts":           getHostTimeseries(),
+		"services-ts-cpu":    getServiceTimeseries("cpu"),
+		"services-ts-memory": getServiceTimeseries("memory"),
+	})
 }
 
 // Agent stats cache
