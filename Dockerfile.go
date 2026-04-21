@@ -117,6 +117,8 @@ RUN sed -i \
     -e 's/github\.com\/swarmpit\/swarmpit/github.com\/ccvass\/swarmpit-xpx/g' \
     -e 's/\[\"swarmpit \"/[\"swarmpit-xpx \"/g' \
     -e 's/\" :: swarmpit\"/" :: swarmpit-xpx"/g' \
+    -e 's/hma\.Dg\.get\.call(null,c,"networkName")/c\&\&hma.Dg?hma.Dg.get.call(null,c,"networkName"):""/g' \
+    -e 's/Vma\.Dg\.get\.call(null,c,"rule")/c\&\&Vma.Dg?Vma.Dg.get.call(null,c,"rule"):""/g' \
     /app/public/js/main.js
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
