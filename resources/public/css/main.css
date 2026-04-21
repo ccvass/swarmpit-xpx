@@ -1665,7 +1665,7 @@ html.dark .Swarmpit-card {
 }
 
 html.dark .Swarmpit-card-avatar {
-    background-color: #7e57c2 !important;
+    background-color: #1E88E5 !important;
 }
 
 html.dark .Swarmpit-paper {
@@ -1749,17 +1749,17 @@ html.dark .Swarmpit-login-text {
 }
 
 html.dark .Swarmpit-login-avatar {
-    background-color: #7e57c2;
+    background-color: #1E88E5;
 }
 
 html.dark .Swarmpit-fcard-header-icon {
-    background: #7e57c2;
-    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .3), 0 7px 10px -5px #7e57c2;
+    background: #1E88E5;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .3), 0 7px 10px -5px #1E88E5;
 }
 
 html.dark .Swarmpit-fcard-header-title {
-    background: #7e57c2;
-    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .3), 0 7px 10px -5px #7e57c2;
+    background: #1E88E5;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, .3), 0 7px 10px -5px #1E88E5;
 }
 
 html.dark .Swarmpit-stepper-horizontal {
@@ -1879,7 +1879,7 @@ html.dark .Swarmpit-label-blue {
 }
 
 html.dark .Swarmpit-label-primary {
-    background-color: #7e57c2 !important;
+    background-color: #1E88E5 !important;
 }
 
 html.dark .Swarmpit-label-grey,
@@ -2027,3 +2027,22 @@ html.dark .MuiListItem-root.Mui-selected {
 html.dark .MuiFormHelperText-root {
     color: rgba(255, 255, 255, 0.5);
 }
+
+/* XPX Blue Theme Override */
+.MuiButton-containedPrimary, .MuiButton-containedPrimary:hover,
+.MuiFab-primary, .MuiFab-primary:hover,
+.MuiCheckbox-colorPrimary.Mui-checked,
+.MuiRadio-colorPrimary.Mui-checked,
+.MuiSwitch-colorPrimary.Mui-checked,
+.MuiLinearProgress-barColorPrimary,
+.MuiCircularProgress-colorPrimary { background-color: #1565C0 !important; color: #fff !important; }
+.MuiButton-textPrimary, .MuiTab-textColorPrimary.Mui-selected,
+.MuiLink-colorPrimary, a.MuiTypography-colorPrimary,
+.MuiCheckbox-colorPrimary.Mui-checked, .MuiRadio-colorPrimary.Mui-checked,
+.MuiSwitch-colorPrimary.Mui-checked + .MuiSwitch-track { color: #1565C0 !important; }
+.MuiTabs-indicator, .MuiLinearProgress-barColorPrimary { background-color: #1565C0 !important; }
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline,
+.MuiInput-underline:after { border-color: #1565C0 !important; }
+.MuiInputLabel-root.Mui-focused { color: #1565C0 !important; }
+.MuiButton-outlinedPrimary { color: #1565C0 !important; border-color: #1565C0 !important; }
+.MuiChip-colorPrimary { background-color: #1565C0 !important; }
