@@ -79,3 +79,4 @@ dist/
 *.db
 !/data/
 web-app/node_modules/
+.playwright-mcp/
