@@ -84,7 +84,7 @@ func recordTimeseries(agentID string, event map[string]any) {
 			if v, ok := tm["cpuPercentage"].(float64); ok {
 				taskCPU = v / 100.0
 			}
-			if v, ok := tm["memory"].(float64); ok {
+			if v, ok := tm["memoryPercentage"].(float64); ok {
 				taskMem = v
 			}
 			tsStore.tasks[name] = appendPoint(tsStore.tasks[name], tsPoint{Ts: now, CPU: taskCPU, Memory: taskMem})
