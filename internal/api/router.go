@@ -31,6 +31,9 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Post("/api/webhooks/{token}", WebhookTrigger)
 	r.Get("/events", SSEHandler)
 	r.Post("/events", EventPush)
+	r.Get("/slt", func(w http.ResponseWriter, r *http.Request) {
+		json200(w, map[string]string{"slt": "go-backend-slt"})
+	})
 
 	// Authenticated
 	r.Group(func(r chi.Router) {

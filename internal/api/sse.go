@@ -18,43 +18,20 @@ var (
 	sseMu      sync.RWMutex
 )
 
-// SSEHandler handles Server-Sent Events connections
+// SSEHandler handles Server-Sent Events connections — sends keepalive only
 func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-
-	client := &sseClient{ch: make(chan []byte, 64), done: make(chan struct{})}
-	sseMu.Lock()
-	sseClients[client] = true
-	sseMu.Unlock()
-
-	defer func() {
-		sseMu.Lock()
-		delete(sseClients, client)
-		sseMu.Unlock()
-		close(client.done)
-	}()
-
-	// Initial OK
 	fmt.Fprintf(w, ":ok\n\n")
 	flusher.Flush()
-
-	for {
-		select {
-		case msg := <-client.ch:
-			fmt.Fprintf(w, "data: %s\n\n", msg)
-			flusher.Flush()
-		case <-r.Context().Done():
-			return
-		}
-	}
+	// Keep connection open with periodic keepalive
+	<-r.Context().Done()
 }
 
 // Broadcast sends an event to all connected SSE clients

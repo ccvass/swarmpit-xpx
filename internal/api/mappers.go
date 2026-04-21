@@ -349,7 +349,14 @@ func mapStack(name string, services []swarm.Service, tasks []swarm.Task) map[str
 	if stackSvcs == nil {
 		stackSvcs = []map[string]any{}
 	}
-	return map[string]any{"stackName": name, "state": "deployed", "services": stackSvcs}
+	state := "deployed"
+	if len(stackSvcs) == 0 {
+		state = "inactive"
+	}
+	return map[string]any{
+		"stackName": name, "state": state, "services": stackSvcs,
+		"networks": []any{}, "volumes": []any{}, "configs": []any{}, "secrets": []any{},
+	}
 }
 
 func parseImage(image string) (name, tag, digest string) {
