@@ -24,8 +24,8 @@ func NewRouter(staticFS fs.FS) http.Handler {
 
 	// Read index.html and inject CSS/JS tags
 	rawIndex, _ := fs.ReadFile(staticFS, "index.html")
-	idx := strings.Replace(string(rawIndex), "</head>", `<link rel="stylesheet" href="/css/main.css?v=2.2.4"></head>`, 1)
-	idx = strings.Replace(idx, "</body>", `<script src="/js/main.js?v=2.2.4"></script></body>`, 1)
+	idx := strings.Replace(string(rawIndex), "</head>", `<link rel="stylesheet" href="/css/main.css?v=2.2.5"></head>`, 1)
+	idx = strings.Replace(idx, "</body>", `<script src="/js/main.js?v=2.2.5"></script></body>`, 1)
 	indexHTML := []byte(idx)
 
 	// Public
