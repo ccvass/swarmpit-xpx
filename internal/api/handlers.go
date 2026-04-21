@@ -683,11 +683,11 @@ func PluginLog(w http.ResponseWriter, r *http.Request) {
 
 func Placement(w http.ResponseWriter, r *http.Request) {
 	nodes, _ := docker.Nodes()
-	var result []map[string]string
+	var result []string
 	for _, n := range nodes {
-		result = append(result, map[string]string{"rule": "node.hostname == " + n.Description.Hostname})
+		result = append(result, "node.hostname == "+n.Description.Hostname)
 		for k, v := range n.Spec.Labels {
-			result = append(result, map[string]string{"rule": "node.labels." + k + " == " + v})
+			result = append(result, "node.labels."+k+" == "+v)
 		}
 	}
 	json200(w, result)
