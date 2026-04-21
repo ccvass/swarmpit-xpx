@@ -195,3 +195,59 @@ func AuditList(w http.ResponseWriter, r *http.Request) {
 	}
 	json200(w, store.AuditEntries(limit, offset))
 }
+
+// Volumes
+
+func VolumeList(w http.ResponseWriter, r *http.Request) {
+	vols, err := docker.Volumes()
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, vols.Volumes)
+}
+
+// Service logs
+
+func ServiceLogs(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tail := r.URL.Query().Get("tail")
+	logs, err := docker.ServiceLogs(id, tail)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, map[string]string{"logs": logs})
+}
+
+// Delete operations
+
+func ServiceDelete(w http.ResponseWriter, r *http.Request) {
+	if err := docker.DeleteService(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	w.WriteHeader(200)
+}
+
+func SecretDelete(w http.ResponseWriter, r *http.Request) {
+	if err := docker.DeleteSecret(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	w.WriteHeader(200)
+}
+
+func ConfigDelete(w http.ResponseWriter, r *http.Request) {
+	if err := docker.DeleteConfig(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	w.WriteHeader(200)
+}
+
+func NetworkDelete(w http.ResponseWriter, r *http.Request) {
+	if err := docker.DeleteNetwork(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	w.WriteHeader(200)
+}
+
+// Node info with stats
+func NodeDetail(w http.ResponseWriter, r *http.Request) {
+	node, err := docker.Node(chi.URLParam(r, "id"))
+	if err != nil { jsonErr(w, 404, err.Error()); return }
+	// Get tasks running on this node
+	tasks, _ := docker.Tasks()
+	var nodeTasks []any
+	for _, t := range tasks {
+		if t.NodeID == node.ID {
+			nodeTasks = append(nodeTasks, t)
+		}
+	}
+	if nodeTasks == nil { nodeTasks = []any{} }
+	json200(w, map[string]any{"node": node, "tasks": nodeTasks})
+}

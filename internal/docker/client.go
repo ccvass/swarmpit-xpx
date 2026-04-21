@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/system"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 )
 
@@ -159,4 +161,54 @@ func UpdateService(id string, version swarm.Version, spec swarm.ServiceSpec) err
 		return fmt.Errorf("update service %s: %w", id, err)
 	}
 	return nil
+}
+
+func Volumes() (volume.ListResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	v, err := cli.VolumeList(ctx, volume.ListOptions{})
+	if err != nil {
+		return v, fmt.Errorf("list volumes: %w", err)
+	}
+	return v, nil
+}
+
+func ServiceLogs(id string, tail string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if tail == "" {
+		tail = "100"
+	}
+	reader, err := cli.ServiceLogs(ctx, id, container.LogsOptions{ShowStdout: true, ShowStderr: true, Tail: tail, Timestamps: true})
+	if err != nil {
+		return "", fmt.Errorf("service logs %s: %w", id, err)
+	}
+	defer reader.Close()
+	buf := make([]byte, 1024*1024)
+	n, _ := reader.Read(buf)
+	return string(buf[:n]), nil
+}
+
+func DeleteService(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ServiceRemove(ctx, id)
+}
+
+func DeleteSecret(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.SecretRemove(ctx, id)
+}
+
+func DeleteConfig(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ConfigRemove(ctx, id)
+}
+
+func DeleteNetwork(id string) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.NetworkRemove(ctx, id)
 }
