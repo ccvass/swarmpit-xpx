@@ -69,10 +69,15 @@
   ([id]
    (service-tasks id false))
   ([id running?]
-   (->> (tasks-memo)
-        (filter #(= id (:ServiceID %)))
-        (filter #(or (not running?) (= "running" (get-in % [:DesiredState]))))
-        (vec))))
+   (-> (execute {:method  :GET
+                 :api     "/tasks"
+                 :options {:query-params
+                           {:filters
+                            (generate-string
+                              (merge {:service [id]}
+                                     (when running?
+                                       {:desired-state ["running"]})))}}})
+       :body)))
 
 (defn service-tasks-by-label
   ([label]
