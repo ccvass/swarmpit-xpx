@@ -354,7 +354,7 @@ func mapTask(t swarm.Task, nodes []swarm.Node, services []swarm.Service, info sy
 		"resources":    res,
 		"nodeId":       t.NodeID,
 		"nodeName":     nodeName,
-		"stats":        getTaskStats(t.ID),
+		"stats":        getTaskStats(tName, t.ID),
 	}
 }
 

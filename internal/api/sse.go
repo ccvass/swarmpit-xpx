@@ -513,11 +513,19 @@ func getNodeStatsCache() map[string]map[string]any {
 	return r
 }
 
-func getTaskStats(taskID string) any {
+func getTaskStats(taskName, taskID string) map[string]any {
 	agentStatsCache.RLock()
 	defer agentStatsCache.RUnlock()
-	if s, ok := agentStatsCache.tasks[taskID]; ok {
-		return s
+	// Agent stores tasks by container ID with name like "/serviceName.slot.taskID"
+	needle := "." + taskID
+	for _, tm := range agentStatsCache.tasks {
+		if name, ok := tm["name"].(string); ok && strings.HasSuffix(name, needle) {
+			cpu := 0.0
+			mem := 0.0
+			if v, ok := tm["cpuPercentage"].(float64); ok { cpu = v / 100.0 }
+			if v, ok := tm["memory"].(float64); ok { mem = v }
+			return map[string]any{"cpu": cpu, "memory": mem}
+		}
 	}
 	return nil
 }
