@@ -29,7 +29,7 @@
      :filterSelectedOptions true
      :value                 networks
      :options               network-list
-     :getOptionLabel        (fn [option] (goog.object/get option "networkName"))
+     :getOptionLabel        (fn [option] (or (aget option "networkName") ""))
      :renderInput           (fn [params]
                               (comp/text-field-js
                                 (js/Object.assign

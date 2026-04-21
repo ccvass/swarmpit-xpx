@@ -26,7 +26,7 @@
        :filterSelectedOptions true
        :options               placements
        :value                 placement
-       :getOptionLabel        (fn [option] (goog.object/get option "rule"))
+       :getOptionLabel        (fn [option] (or (aget option "rule") ""))
        :renderInput           (fn [params]
                                 (comp/text-field-js
                                   (js/Object.assign
