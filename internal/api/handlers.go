@@ -235,10 +235,20 @@ func StackTasks(w http.ResponseWriter, r *http.Request) {
 
 func StackNetworks(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
 	nets, _ := docker.Networks()
+	// Collect network IDs used by services in this stack
+	netIDs := map[string]bool{}
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			for _, n := range s.Spec.TaskTemplate.Networks {
+				netIDs[n.Target] = true
+			}
+		}
+	}
 	var result []map[string]any
 	for _, n := range nets {
-		if n.Labels["com.docker.stack.namespace"] == name {
+		if netIDs[n.ID] {
 			result = append(result, mapNetwork(n))
 		}
 	}
@@ -248,10 +258,23 @@ func StackNetworks(w http.ResponseWriter, r *http.Request) {
 
 func StackVolumes(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	// Volumes from stack label + volumes used in mounts by stack services
+	svcs, _ := docker.Services()
 	vols, _ := docker.Volumes()
+	volNames := map[string]bool{}
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			for _, m := range s.Spec.TaskTemplate.ContainerSpec.Mounts {
+				if string(m.Type) == "volume" {
+					volNames[m.Source] = true
+				}
+			}
+		}
+	}
+	// Also include volumes with the stack label
 	var result []map[string]any
 	for _, v := range vols.Volumes {
-		if v.Labels["com.docker.stack.namespace"] == name {
+		if v.Labels["com.docker.stack.namespace"] == name || volNames[v.Name] {
 			result = append(result, mapVolume(v))
 		}
 	}
@@ -261,10 +284,20 @@ func StackVolumes(w http.ResponseWriter, r *http.Request) {
 
 func StackConfigs(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
 	configs, _ := docker.Configs()
+	// Collect config IDs used by stack services
+	cfgIDs := map[string]bool{}
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			for _, c := range s.Spec.TaskTemplate.ContainerSpec.Configs {
+				cfgIDs[c.ConfigID] = true
+			}
+		}
+	}
 	var result []map[string]any
 	for _, c := range configs {
-		if c.Spec.Labels["com.docker.stack.namespace"] == name {
+		if c.Spec.Labels["com.docker.stack.namespace"] == name || cfgIDs[c.ID] {
 			result = append(result, mapConfig(c))
 		}
 	}
@@ -274,10 +307,20 @@ func StackConfigs(w http.ResponseWriter, r *http.Request) {
 
 func StackSecrets(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
 	secrets, _ := docker.Secrets()
+	// Collect secret IDs used by stack services
+	secIDs := map[string]bool{}
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			for _, sec := range s.Spec.TaskTemplate.ContainerSpec.Secrets {
+				secIDs[sec.SecretID] = true
+			}
+		}
+	}
 	var result []map[string]any
 	for _, s := range secrets {
-		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name || secIDs[s.ID] {
 			result = append(result, mapSecret(s))
 		}
 	}
