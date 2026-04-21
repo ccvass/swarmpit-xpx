@@ -3,6 +3,8 @@ package api
 import (
 	"sync"
 	"time"
+
+	"github.com/ccvass/swarmpit-xpx/internal/docker"
 )
 
 // Ring buffer for timeseries data — keeps 24h at ~5s intervals per node/task
@@ -121,21 +123,30 @@ func extractServiceName(taskName string) string {
 func getHostTimeseries() []map[string]any {
 	tsStore.RLock()
 	defer tsStore.RUnlock()
+	// Resolve node IDs to hostnames
+	nodes, _ := docker.Nodes()
+	hostnames := map[string]string{}
+	for _, n := range nodes {
+		hostnames[n.ID] = n.Description.Hostname
+	}
 	var result []map[string]any
 	for host, points := range tsStore.hosts {
-		values := make([][]any, len(points))
+		if len(points) == 0 { continue }
+		name := hostnames[host]
+		if name == "" { name = host }
+		times := make([]int64, len(points))
+		cpus := make([]float64, len(points))
+		mems := make([]float64, len(points))
 		for i, p := range points {
-			values[i] = []any{p.Ts * 1000, p.CPU, p.Memory} // ms for frontend
+			times[i] = p.Ts * 1000
+			cpus[i] = p.CPU
+			mems[i] = p.Memory
 		}
 		result = append(result, map[string]any{
-			"name":    host,
-			"columns": []string{"time", "cpu", "memory"},
-			"values":  values,
+			"name": name, "time": times, "cpu": cpus, "memory": mems,
 		})
 	}
-	if result == nil {
-		result = []map[string]any{}
-	}
+	if result == nil { result = []map[string]any{} }
 	return result
 }
 
@@ -144,22 +155,20 @@ func getServiceTimeseries(sortBy string) []map[string]any {
 	defer tsStore.RUnlock()
 	var result []map[string]any
 	for svc, points := range tsStore.services {
-		if len(points) == 0 {
-			continue
-		}
-		values := make([][]any, len(points))
+		if len(points) == 0 { continue }
+		times := make([]int64, len(points))
+		cpus := make([]float64, len(points))
+		mems := make([]float64, len(points))
 		for i, p := range points {
-			values[i] = []any{p.Ts * 1000, p.CPU, p.Memory}
+			times[i] = p.Ts * 1000
+			cpus[i] = p.CPU
+			mems[i] = p.Memory
 		}
 		result = append(result, map[string]any{
-			"name":    svc,
-			"columns": []string{"time", "cpu", "memory"},
-			"values":  values,
+			"name": svc, "time": times, "cpu": cpus, "memory": mems,
 		})
 	}
-	if result == nil {
-		result = []map[string]any{}
-	}
+	if result == nil { result = []map[string]any{} }
 	return result
 }
 
@@ -167,16 +176,16 @@ func getTaskTimeseries(taskName string) []map[string]any {
 	tsStore.RLock()
 	defer tsStore.RUnlock()
 	points, ok := tsStore.tasks[taskName]
-	if !ok || len(points) == 0 {
-		return []map[string]any{}
-	}
-	values := make([][]any, len(points))
+	if !ok || len(points) == 0 { return []map[string]any{} }
+	times := make([]int64, len(points))
+	cpus := make([]float64, len(points))
+	mems := make([]float64, len(points))
 	for i, p := range points {
-		values[i] = []any{p.Ts * 1000, p.CPU, p.Memory}
+		times[i] = p.Ts * 1000
+		cpus[i] = p.CPU
+		mems[i] = p.Memory
 	}
 	return []map[string]any{{
-		"name":    taskName,
-		"columns": []string{"time", "cpu", "memory"},
-		"values":  values,
+		"name": taskName, "time": times, "cpu": cpus, "memory": mems,
 	}}
 }

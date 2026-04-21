@@ -82,8 +82,6 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	storeAgentStats(event)
-	// Build dashboard data and broadcast to SSE clients
-	go broadcastDashboard()
 	w.WriteHeader(http.StatusAccepted)
 }
 
