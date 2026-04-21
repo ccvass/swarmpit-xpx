@@ -344,23 +344,39 @@ func Stats(w http.ResponseWriter, r *http.Request) {
 	totalCPU := 0.0
 	totalMem := int64(0)
 	resources := map[string]map[string]any{}
-	for _, n := range nodes {
-		if n.Status.State != "ready" { continue }
-		cpu := float64(n.Description.Resources.NanoCPUs) / 1e9
-		mem := n.Description.Resources.MemoryBytes
-		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
-		// Only count nodes with agent stats for totals
-		if _, hasStats := cache[n.ID]; hasStats {
-			totalCPU += cpu
-			totalMem += mem
+	cpuSum, memSum, diskSum := 0.0, 0.0, 0.0
+	memUsed, diskUsed, diskTotal := int64(0), int64(0), int64(0)
+	n := 0
+	for _, nd := range nodes {
+		if nd.Status.State != "ready" { continue }
+		cpu := float64(nd.Description.Resources.NanoCPUs) / 1e9
+		mem := nd.Description.Resources.MemoryBytes
+		totalCPU += cpu
+		totalMem += mem
+		resources[nd.ID] = map[string]any{"cores": cpu, "memory": mem}
+		if s, ok := cache[nd.ID]; ok {
+			n++
+			if c, ok := s["cpu"].(map[string]any); ok {
+				if v, ok := c["usedPercentage"].(float64); ok { cpuSum += v }
+			}
+			if m, ok := s["memory"].(map[string]any); ok {
+				if v, ok := m["usedPercentage"].(float64); ok { memSum += v }
+				if v, ok := m["used"].(float64); ok { memUsed += int64(v) }
+			}
+			if d, ok := s["disk"].(map[string]any); ok {
+				if v, ok := d["usedPercentage"].(float64); ok { diskSum += v }
+				if v, ok := d["used"].(float64); ok { diskUsed += int64(v) }
+				if v, ok := d["total"].(float64); ok { diskTotal += int64(v) }
+			}
 		}
 	}
-	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
+	cpuAvg, memAvg, diskAvg := 0.0, 0.0, 0.0
+	if n > 0 { cpuAvg = cpuSum / float64(n); memAvg = memSum / float64(n); diskAvg = diskSum / float64(n) }
 	json200(w, map[string]any{
 		"resources": resources,
-		"cpu":    map[string]any{"usage": cpuU, "cores": totalCPU},
-		"memory": map[string]any{"usage": memU, "used": memUsed, "total": totalMem},
-		"disk":   map[string]any{"usage": diskU, "used": diskUsed, "total": diskTotal},
+		"cpu":    map[string]any{"usage": cpuAvg, "cores": totalCPU},
+		"memory": map[string]any{"usage": memAvg, "used": memUsed, "total": totalMem},
+		"disk":   map[string]any{"usage": diskAvg, "used": diskUsed, "total": diskTotal},
 	})
 }
 
