@@ -78,3 +78,4 @@ dist/
 # Database (local dev)
 *.db
 !/data/
+web-app/node_modules/
