@@ -367,7 +367,7 @@ func Stats(w http.ResponseWriter, r *http.Request) {
 
 // NodeTimeseries returns empty timeseries (stats not implemented in Go backend yet)
 func NodeTimeseries(w http.ResponseWriter, r *http.Request) {
-	json200(w, []any{})
+	json200(w, getHostTimeseries())
 }
 
 // ServiceTaskList returns tasks for a specific service
@@ -628,9 +628,9 @@ func ServiceCompose(w http.ResponseWriter, r *http.Request) {
 }
 
 // Timeseries (empty — no historical data in Go backend yet)
-func ServicesTsCPU(w http.ResponseWriter, r *http.Request)    { json200(w, []any{}) }
-func ServicesTsMemory(w http.ResponseWriter, r *http.Request) { json200(w, []any{}) }
-func TaskTimeseries(w http.ResponseWriter, r *http.Request)   { json200(w, []any{}) }
+func ServicesTsCPU(w http.ResponseWriter, r *http.Request) { json200(w, getServiceTimeseries("cpu")) }
+func ServicesTsMemory(w http.ResponseWriter, r *http.Request) { json200(w, getServiceTimeseries("memory")) }
+func TaskTimeseries(w http.ResponseWriter, r *http.Request) { json200(w, getTaskTimeseries(chi.URLParam(r, "id"))) }
 
 // Plugins and placement
 func LabelsService(w http.ResponseWriter, r *http.Request) {

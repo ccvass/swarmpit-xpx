@@ -154,8 +154,8 @@ func storeAgentStats(event map[string]any) {
 		}
 	}
 	agentStatsCache.Unlock()
+	recordTimeseries(id, msg)
 }
-
 // getNodeStatsCache returns a copy of node stats keyed by node ID
 func getNodeStatsCache() map[string]map[string]any {
 	agentStatsCache.RLock()
