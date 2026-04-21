@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+
+	"github.com/ccvass/swarmpit-xpx/internal/docker"
 )
 
 type sseClient struct {
@@ -18,7 +20,7 @@ var (
 	sseMu      sync.RWMutex
 )
 
-// SSEHandler handles Server-Sent Events connections — sends keepalive only
+// SSEHandler handles Server-Sent Events connections
 func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -28,10 +30,30 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+
+	client := &sseClient{ch: make(chan []byte, 64), done: make(chan struct{})}
+	sseMu.Lock()
+	sseClients[client] = true
+	sseMu.Unlock()
+
+	defer func() {
+		sseMu.Lock()
+		delete(sseClients, client)
+		sseMu.Unlock()
+	}()
+
 	fmt.Fprintf(w, ":ok\n\n")
 	flusher.Flush()
-	// Keep connection open with periodic keepalive
-	<-r.Context().Done()
+
+	for {
+		select {
+		case msg := <-client.ch:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 // Broadcast sends an event to all connected SSE clients
@@ -59,10 +81,33 @@ func EventPush(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 400, "invalid event data")
 		return
 	}
-	// Store stats from agent
 	storeAgentStats(event)
-	Broadcast(event)
+	// Build dashboard data and broadcast to SSE clients
+	go broadcastDashboard()
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func broadcastDashboard() {
+	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
+	nodes, _ := docker.Nodes()
+	totalCPU := 0.0
+	totalMem := int64(0)
+	resources := map[string]map[string]any{}
+	for _, n := range nodes {
+		if n.Status.State != "ready" { continue }
+		cpu := float64(n.Description.Resources.NanoCPUs) / 1e9
+		mem := n.Description.Resources.MemoryBytes
+		totalCPU += cpu
+		totalMem += mem
+		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
+	}
+	stats := map[string]any{
+		"resources": resources,
+		"cpu":    map[string]any{"usage": cpuU, "cores": totalCPU},
+		"memory": map[string]any{"usage": memU, "used": memUsed, "total": totalMem},
+		"disk":   map[string]any{"usage": diskU, "used": diskUsed, "total": diskTotal},
+	}
+	Broadcast(map[string]any{"stats": stats})
 }
 
 // Agent stats cache
