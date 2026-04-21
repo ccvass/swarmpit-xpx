@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -38,6 +39,17 @@ func mapToNameValue(m map[string]string) []map[string]string {
 
 func nanoToSec(n int64) int64 { return n / 1_000_000_000 }
 
+// jsonFloat forces JSON serialization as float (e.g., 0 → 0.0)
+type jsonFloat float64
+
+func (f jsonFloat) MarshalJSON() ([]byte, error) {
+	v := float64(f)
+	if v == float64(int64(v)) {
+		return []byte(fmt.Sprintf("%.1f", v)), nil
+	}
+	return json.Marshal(v)
+}
+
 func nilStr(s string) any {
 	if s == "" {
 		return nil
@@ -54,28 +66,28 @@ func nilLabels(m map[string]string) any {
 
 func resources(r *swarm.Resources) map[string]any {
 	if r == nil {
-		return map[string]any{"cpu": 0.0, "memory": 0}
+		return map[string]any{"cpu": jsonFloat(0), "memory": 0}
 	}
 	return map[string]any{
-		"cpu":    float64(r.NanoCPUs) / 1e9,
+		"cpu":    jsonFloat(float64(r.NanoCPUs) / 1e9),
 		"memory": int64(r.MemoryBytes) / (1024 * 1024),
 	}
 }
 
 func limitResources(l *swarm.Limit) map[string]any {
 	if l == nil {
-		return map[string]any{"cpu": 0.0, "memory": 0}
+		return map[string]any{"cpu": jsonFloat(0), "memory": 0}
 	}
 	return map[string]any{
-		"cpu":    float64(l.NanoCPUs) / 1e9,
+		"cpu":    jsonFloat(float64(l.NanoCPUs) / 1e9),
 		"memory": int64(l.MemoryBytes) / (1024 * 1024),
 	}
 }
 
 func serviceResources(tt *swarm.TaskSpec) map[string]any {
 	res := map[string]any{
-		"reservation": map[string]any{"cpu": 0.0, "memory": 0},
-		"limit":       map[string]any{"cpu": 0.0, "memory": 0},
+		"reservation": map[string]any{"cpu": jsonFloat(0), "memory": 0},
+		"limit":       map[string]any{"cpu": jsonFloat(0), "memory": 0},
 	}
 	if tt.Resources != nil {
 		if tt.Resources.Reservations != nil {
