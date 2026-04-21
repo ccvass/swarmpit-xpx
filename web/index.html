@@ -1,27 +1,54 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Swarmpit XPX</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <style>
-    :root{--nav-w:220px}
-    body{margin:0;display:flex;min-height:100vh}
-    nav.sidebar{width:var(--nav-w);background:var(--pico-card-background-color);border-right:1px solid var(--pico-muted-border-color);padding:1rem;position:fixed;height:100vh;overflow-y:auto}
-    nav.sidebar h4{margin:0 0 1rem}
-    nav.sidebar a{display:block;padding:.4rem .6rem;border-radius:4px;text-decoration:none;color:var(--pico-color);font-size:.9rem}
-    nav.sidebar a:hover,nav.sidebar a.active{background:var(--pico-primary-focus)}
-    main.content{margin-left:var(--nav-w);padding:1.5rem;flex:1}
-    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
-    .stat-card{padding:1rem;border-radius:8px;background:var(--pico-card-background-color);border:1px solid var(--pico-muted-border-color)}
-    .stat-card h3{margin:0;font-size:2rem}
-    .stat-card small{color:var(--pico-muted-color)}
-    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
-    .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
-    .bg{background:#d4edda;color:#155724}.br{background:#f8d7da;color:#721c24}.bb{background:#cce5ff;color:#004085}.by{background:#e2e3e5;color:#383d41}
-    table{font-size:.85rem}
-    @media(max-width:768px){nav.sidebar{display:none}main.content{margin-left:0}}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#f5f7fa;color:#1a1a2e}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{width:240px;background:#1a1a2e;color:#fff;padding:0;position:fixed;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+    .sidebar .logo{padding:1.2rem 1.5rem;font-size:1.1rem;font-weight:700;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:.5rem}
+    .sidebar .logo span{color:#6c63ff}
+    .sidebar .menu{flex:1;padding:.5rem 0}
+    .sidebar .menu a{display:flex;align-items:center;gap:.7rem;padding:.65rem 1.5rem;color:rgba(255,255,255,.7);text-decoration:none;font-size:.88rem;transition:all .15s}
+    .sidebar .menu a:hover{background:rgba(255,255,255,.08);color:#fff}
+    .sidebar .menu a.active{background:rgba(108,99,255,.3);color:#fff;border-right:3px solid #6c63ff}
+    .sidebar .menu a svg{width:18px;height:18px;opacity:.7}
+    .sidebar .bottom{padding:1rem 1.5rem;border-top:1px solid rgba(255,255,255,.1)}
+    .sidebar .bottom a{color:rgba(255,255,255,.5);text-decoration:none;font-size:.82rem}
+    .main{margin-left:240px;flex:1;padding:1.5rem 2rem}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+    .topbar h1{font-size:1.5rem;margin:0;font-weight:600}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
+    .card{background:#fff;border-radius:12px;padding:1.2rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .card .label{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:.5px}
+    .card .value{font-size:2rem;font-weight:700;color:#1a1a2e;margin:.2rem 0}
+    .card .sub{font-size:.8rem;color:#aaa}
+    .tbl{width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .tbl table{width:100%;border-collapse:collapse;font-size:.85rem}
+    .tbl th{background:#f8f9fb;padding:.7rem 1rem;text-align:left;font-weight:600;color:#555;font-size:.78rem;text-transform:uppercase;letter-spacing:.3px}
+    .tbl td{padding:.65rem 1rem;border-top:1px solid #f0f0f0}
+    .tbl tr:hover{background:#f8f9fb}
+    .tbl tr.clickable{cursor:pointer}
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600}
+    .b-green{background:#e8f5e9;color:#2e7d32}.b-red{background:#ffebee;color:#c62828}
+    .b-blue{background:#e3f2fd;color:#1565c0}.b-gray{background:#f5f5f5;color:#616161}
+    .search{padding:.5rem 1rem;border:1px solid #e0e0e0;border-radius:8px;font-size:.85rem;width:260px;outline:none}
+    .search:focus{border-color:#6c63ff}
+    .login-wrap{display:flex;justify-content:center;align-items:center;height:100vh;background:linear-gradient(135deg,#1a1a2e,#16213e)}
+    .login-box{background:#fff;padding:2.5rem;border-radius:16px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .login-box h2{margin:0 0 .3rem;color:#1a1a2e}.login-box p{color:#888;margin:0 0 1.5rem;font-size:.9rem}
+    .login-box input{width:100%;padding:.7rem;margin-bottom:.8rem;border:1px solid #ddd;border-radius:8px;font-size:.9rem}
+    .login-box button{width:100%;padding:.75rem;background:#6c63ff;color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer}
+    .login-box button:hover{background:#5a52d5}
+    .login-box .err{color:#c62828;font-size:.85rem;margin-bottom:.5rem}
+    article{background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:1.5rem}
+    article dt{font-weight:600;color:#555;font-size:.82rem;margin-top:.8rem}
+    article dd{margin:0;font-size:.95rem}
+    @media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:1rem}}
   </style>
 </head>
 <body>
@@ -37,14 +64,17 @@ const api = {
   async req(path, opts = {}) {
     const hdrs = { 'Content-Type': 'application/json' };
     if (this.token) hdrs.Authorization = this.token;
-    const r = await fetch(path, { ...opts, headers: { ...hdrs, ...opts.headers } });
-    if (r.status === 401) { this.token = null; localStorage.removeItem('token'); location.hash = '#/login'; return null; }
-    return r.json();
+    try {
+      const r = await fetch(path, { ...opts, headers: { ...hdrs, ...opts.headers } });
+      if (r.status === 401) { this.logout(); return null; }
+      return r.json();
+    } catch(e) { return null; }
   },
   get(p) { return this.req(p); },
   post(p, b) { return this.req(p, { method: 'POST', body: JSON.stringify(b) }); },
   login(u, p) { return this.req('/login', { method: 'POST', headers: { Authorization: 'Basic ' + btoa(u + ':' + p) } }); },
-  setToken(t) { this.token = t; localStorage.setItem('token', t); }
+  setToken(t) { this.token = t; localStorage.setItem('token', t); },
+  logout() { this.token = null; localStorage.removeItem('token'); location.hash = '#/login'; }
 };
 
 function useRoute() {
@@ -54,117 +84,136 @@ function useRoute() {
   return { path: parts[0] || '', param: parts.slice(1).join('/') };
 }
 
-function badge(status) {
+function bdg(status) {
   const s = (status || '').toLowerCase();
-  const c = s.includes('running') || s === 'ready' || s === 'active' ? 'bg' : s.includes('shutdown') || s === 'down' || s === 'drain' ? 'br' : s.includes('leader') || s === 'reachable' ? 'bb' : 'by';
-  return html`<span class="badge ${c}">${status || 'unknown'}</span>`;
+  const c = s.includes('running') || s === 'ready' || s === 'active' || s === 'complete' ? 'b-green' : s.includes('shutdown') || s === 'down' || s === 'drain' || s.includes('fail') || s.includes('reject') ? 'b-red' : s.includes('leader') || s === 'reachable' || s.includes('preparing') ? 'b-blue' : 'b-gray';
+  return html`<span class="badge ${c}">${status || '-'}</span>`;
 }
 
 function Login() {
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [err, setErr] = useState('');
-  const go = async (e) => { e.preventDefault(); const r = await api.login(u, p); if (r && r.token) { api.setToken(r.token); location.hash = '#/'; } else setErr('Invalid credentials'); };
-  return html`<main style="margin:0;display:flex;justify-content:center;align-items:center;height:100vh">
-    <article style="width:350px"><h3>Swarmpit XPX</h3>
-    ${err && html`<p style="color:red">${err}</p>`}
+  const go = async (e) => { e.preventDefault(); const r = await api.login(u, p); if (r && r.token) { api.setToken(r.token); location.hash = '#/'; location.reload(); } else setErr('Invalid credentials'); };
+  return html`<div class="login-wrap"><div class="login-box">
+    <h2>Swarmpit XPX</h2><p>Docker Swarm Management</p>
+    ${err && html`<div class="err">${err}</div>`}
     <form onSubmit=${go}><input placeholder="Username" value=${u} onInput=${e => setU(e.target.value)} required />
     <input type="password" placeholder="Password" value=${p} onInput=${e => setP(e.target.value)} required />
-    <button type="submit">Login</button></form></article></main>`;
+    <button type="submit">Sign In</button></form></div></div>`;
 }
 
 function Init() {
   const [f, setF] = useState({ username: '', password: '', email: '' });
   const [err, setErr] = useState('');
   const go = async (e) => { e.preventDefault(); const r = await api.post('/initialize', f); if (r && r.error) setErr(r.error); else location.hash = '#/login'; };
-  return html`<main style="margin:0;display:flex;justify-content:center;align-items:center;height:100vh">
-    <article style="width:350px"><h3>Setup Admin</h3>${err && html`<p style="color:red">${err}</p>`}
+  return html`<div class="login-wrap"><div class="login-box">
+    <h2>Welcome</h2><p>Create your admin account</p>
+    ${err && html`<div class="err">${err}</div>`}
     <form onSubmit=${go}><input placeholder="Username" onInput=${e => setF({ ...f, username: e.target.value })} required />
     <input type="password" placeholder="Password" onInput=${e => setF({ ...f, password: e.target.value })} required />
     <input type="email" placeholder="Email" onInput=${e => setF({ ...f, email: e.target.value })} />
-    <button type="submit">Create Admin</button></form></article></main>`;
+    <button type="submit">Create Admin</button></form></div></div>`;
 }
 
 function Nav({ path }) {
-  const links = [['', 'Dashboard'], ['services', 'Services'], ['stacks', 'Stacks'], ['nodes', 'Nodes'], ['networks', 'Networks'], ['secrets', 'Secrets'], ['configs', 'Configs'], ['tasks', 'Tasks']];
-  const logout = () => { api.token = null; localStorage.removeItem('token'); location.hash = '#/login'; };
-  return html`<nav class="sidebar"><h4>⬡ XPX</h4>
-    ${links.map(([p, l]) => html`<a href="#/${p}" class=${path === p ? 'active' : ''}>${l}</a>`)}
-    <hr /><a href="#" onClick=${logout}>Logout</a></nav>`;
+  const items = [
+    ['', 'Dashboard', 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
+    ['services', 'Services', 'M4 6h16M4 10h16M4 14h16M4 18h16'],
+    ['stacks', 'Stacks', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
+    ['nodes', 'Nodes', 'M5 12h14M12 5l7 7-7 7'],
+    ['networks', 'Networks', 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9'],
+    ['secrets', 'Secrets', 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'],
+    ['configs', 'Configs', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'],
+    ['tasks', 'Tasks', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2']
+  ];
+  return html`<div class="sidebar">
+    <div class="logo"><span>⬡</span> Swarmpit XPX</div>
+    <div class="menu">
+      ${items.map(([p, l, icon]) => html`<a href="#/${p}" class=${path === p ? 'active' : ''}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="${icon}" /></svg>
+        ${l}</a>`)}
+    </div>
+    <div class="bottom"><a href="#" onClick=${() => api.logout()}>← Sign Out</a></div>
+  </div>`;
 }
 
 function Tbl({ cols, rows, onClick }) {
-  return html`<figure><table><thead><tr>${cols.map(c => html`<th>${c}</th>`)}</tr></thead>
-    <tbody>${(rows || []).map((r, i) => html`<tr style=${onClick ? 'cursor:pointer' : ''} onClick=${() => onClick && onClick(i)}>
-      ${r.map(c => html`<td>${c || '-'}</td>`)}</tr>`)}</tbody></table></figure>`;
+  return html`<div class="tbl"><table><thead><tr>${cols.map(c => html`<th>${c}</th>`)}</tr></thead>
+    <tbody>${(rows || []).map((r, i) => html`<tr class=${onClick ? 'clickable' : ''} onClick=${() => onClick && onClick(i)}>
+      ${r.map(c => html`<td>${c == null ? '-' : c}</td>`)}</tr>`)}</tbody></table></div>`;
 }
 
 function List({ title, endpoint, cols, mapRow, detail }) {
   const [data, setData] = useState([]);
   const [q, setQ] = useState('');
-  useEffect(() => { api.get(endpoint).then(d => setData(d || [])); }, [endpoint]);
+  useEffect(() => { api.get(endpoint).then(d => d && setData(d)); }, [endpoint]);
   const f = q ? data.filter(d => JSON.stringify(d).toLowerCase().includes(q.toLowerCase())) : data;
-  return html`<div class="topbar"><h2>${title} (${f.length})</h2>
-    <input type="search" placeholder="Filter..." style="width:250px" onInput=${e => setQ(e.target.value)} /></div>
+  return html`<div class="topbar"><h1>${title} <span style="color:#aaa;font-weight:400">${f.length}</span></h1>
+    <input class="search" type="search" placeholder="Search..." onInput=${e => setQ(e.target.value)} /></div>
     <${Tbl} cols=${cols} rows=${f.map(mapRow)} onClick=${detail ? i => { location.hash = detail(f[i]); } : null} />`;
 }
 
 function Dashboard() {
   const [nodes, setNodes] = useState([]);
   const [svcs, setSvcs] = useState([]);
-  useEffect(() => { api.get('/api/nodes').then(d => setNodes(d || [])); api.get('/api/services').then(d => setSvcs(d || [])); }, []);
-  return html`<div class="topbar"><h2>Dashboard</h2></div>
-    <div class="stats">
-      <div class="stat-card"><small>Nodes</small><h3>${nodes.length}</h3></div>
-      <div class="stat-card"><small>Services</small><h3>${svcs.length}</h3></div>
+  useEffect(() => { api.get('/api/nodes').then(d => d && setNodes(d)); api.get('/api/services').then(d => d && setSvcs(d)); }, []);
+  const mgr = nodes.filter(n => n.ManagerStatus).length;
+  const ready = nodes.filter(n => n.Status?.State === 'ready').length;
+  const stacks = new Set(svcs.map(s => s.Spec?.Labels?.['com.docker.stack.namespace']).filter(Boolean)).size;
+  return html`<div class="topbar"><h1>Dashboard</h1></div>
+    <div class="cards">
+      <div class="card"><div class="label">Nodes</div><div class="value">${nodes.length}</div><div class="sub">${ready} ready · ${mgr} managers</div></div>
+      <div class="card"><div class="label">Services</div><div class="value">${svcs.length}</div><div class="sub">${stacks} stacks</div></div>
     </div>
-    <h4>Nodes</h4>
-    <${Tbl} cols=${['Hostname', 'Role', 'State', 'Engine']}
-      rows=${nodes.map(n => [n.Description?.Hostname, n.ManagerStatus ? 'Manager' : 'Worker', badge(n.Status?.State), n.Description?.Engine?.EngineVersion])} />`;
+    <h3 style="margin-bottom:.8rem">Nodes</h3>
+    <${Tbl} cols=${['Hostname', 'Role', 'State', 'Availability', 'Engine']}
+      rows=${nodes.map(n => [n.Description?.Hostname, n.ManagerStatus ? bdg(n.ManagerStatus.Reachability || 'Leader') : 'Worker', bdg(n.Status?.State), bdg(n.Spec?.Availability), n.Description?.Engine?.EngineVersion])} />`;
 }
 
 function SvcDetail({ id }) {
   const [svc, setSvc] = useState(null);
   const [tasks, setTasks] = useState([]);
-  useEffect(() => { api.get('/api/services/' + id).then(setSvc); api.get('/api/tasks').then(t => setTasks((t || []).filter(x => x.ServiceID === id))); }, [id]);
+  useEffect(() => { api.get('/api/services/' + id).then(d => d && setSvc(d)); api.get('/api/tasks').then(t => t && setTasks(t.filter(x => x.ServiceID === id))); }, [id]);
   if (!svc) return html`<p>Loading...</p>`;
   const s = svc.Spec || {};
-  return html`<h2>${s.Name}</h2>
+  return html`<div class="topbar"><h1>${s.Name}</h1></div>
     <article><dl>
       <dt>Image</dt><dd>${s.TaskTemplate?.ContainerSpec?.Image?.split('@')[0]}</dd>
       <dt>Mode</dt><dd>${s.Mode?.Replicated ? 'Replicated (' + (s.Mode.Replicated.Replicas || 1) + ')' : 'Global'}</dd>
+      <dt>Created</dt><dd>${new Date(svc.CreatedAt).toLocaleString()}</dd>
       <dt>Updated</dt><dd>${new Date(svc.UpdatedAt).toLocaleString()}</dd>
     </dl></article>
-    <h4>Tasks (${tasks.length})</h4>
-    <${Tbl} cols=${['ID', 'Node', 'State', 'Updated']}
-      rows=${tasks.map(t => [t.ID?.slice(0, 12), t.NodeID?.slice(0, 12), badge(t.Status?.State), new Date(t.UpdatedAt).toLocaleString()])} />`;
+    <h3 style="margin-bottom:.8rem">Tasks (${tasks.length})</h3>
+    <${Tbl} cols=${['ID', 'Node', 'State', 'Message', 'Updated']}
+      rows=${tasks.sort((a, b) => b.UpdatedAt?.localeCompare(a.UpdatedAt)).map(t => [t.ID?.slice(0, 12), t.NodeID?.slice(0, 12), bdg(t.Status?.State), t.Status?.Message || '', new Date(t.UpdatedAt).toLocaleString()])} />`;
 }
 
 function App() {
   const { path, param } = useRoute();
   const [ver, setVer] = useState(null);
-  useEffect(() => { fetch('/version').then(r => r.json()).then(setVer); }, []);
-  if (!ver) return html`<p>Loading...</p>`;
-  if (!ver.initialized && path !== 'login') return html`<${Init} />`;
+  useEffect(() => { fetch('/version').then(r => r.json()).then(setVer).catch(() => setVer({ initialized: false })); }, []);
+  if (!ver) return html`<div class="login-wrap"><p style="color:#fff">Loading...</p></div>`;
+  if (!ver.initialized) return html`<${Init} />`;
   if (!api.token || path === 'login') return html`<${Login} />`;
 
   let view;
   if (path === 'services' && param) view = html`<${SvcDetail} id=${param} />`;
-  else if (path === '' || path === undefined) view = html`<${Dashboard} />`;
+  else if (!path) view = html`<${Dashboard} />`;
   else if (path === 'services') view = html`<${List} title="Services" endpoint="/api/services" cols=${['Name', 'Image', 'Mode', 'Replicas']}
-    mapRow=${s => [s.Spec?.Name, s.Spec?.TaskTemplate?.ContainerSpec?.Image?.split('@')[0], s.Spec?.Mode?.Replicated ? 'replicated' : 'global', s.Spec?.Mode?.Replicated?.Replicas || '-']}
+    mapRow=${s => [s.Spec?.Name, s.Spec?.TaskTemplate?.ContainerSpec?.Image?.split('@')[0], s.Spec?.Mode?.Replicated ? 'Replicated' : 'Global', s.Spec?.Mode?.Replicated?.Replicas || '-']}
     detail=${s => '#/services/' + s.ID} />`;
   else if (path === 'stacks') view = html`<${List} title="Stacks" endpoint="/api/stacks" cols=${['Name', 'Services']} mapRow=${s => [s.stackName, s.serviceCount]} />`;
-  else if (path === 'nodes') view = html`<${List} title="Nodes" endpoint="/api/nodes" cols=${['Hostname', 'Role', 'State', 'Engine']}
-    mapRow=${n => [n.Description?.Hostname, n.ManagerStatus ? 'Manager' : 'Worker', badge(n.Status?.State), n.Description?.Engine?.EngineVersion]} />`;
+  else if (path === 'nodes') view = html`<${List} title="Nodes" endpoint="/api/nodes" cols=${['Hostname', 'Role', 'State', 'Availability', 'Engine']}
+    mapRow=${n => [n.Description?.Hostname, n.ManagerStatus ? 'Manager' : 'Worker', bdg(n.Status?.State), bdg(n.Spec?.Availability), n.Description?.Engine?.EngineVersion]} />`;
   else if (path === 'networks') view = html`<${List} title="Networks" endpoint="/api/networks" cols=${['Name', 'Driver', 'Scope']} mapRow=${n => [n.Name, n.Driver, n.Scope]} />`;
   else if (path === 'secrets') view = html`<${List} title="Secrets" endpoint="/api/secrets" cols=${['Name', 'Created']} mapRow=${s => [s.Spec?.Name, new Date(s.CreatedAt).toLocaleDateString()]} />`;
   else if (path === 'configs') view = html`<${List} title="Configs" endpoint="/api/configs" cols=${['Name', 'Created']} mapRow=${s => [s.Spec?.Name, new Date(s.CreatedAt).toLocaleDateString()]} />`;
   else if (path === 'tasks') view = html`<${List} title="Tasks" endpoint="/api/tasks" cols=${['ID', 'Service', 'State', 'Updated']}
-    mapRow=${t => [t.ID?.slice(0, 12), t.ServiceID?.slice(0, 12), badge(t.Status?.State), new Date(t.UpdatedAt).toLocaleDateString()]} />`;
+    mapRow=${t => [t.ID?.slice(0, 12), t.ServiceID?.slice(0, 12), bdg(t.Status?.State), new Date(t.UpdatedAt).toLocaleDateString()]} />`;
   else view = html`<${Dashboard} />`;
 
-  return html`<${Nav} path=${path} /><main class="content">${view}</main>`;
+  return html`<div class="layout"><${Nav} path=${path} /><div class="main">${view}</div></div>`;
 }
 
 render(html`<${App} />`, document.getElementById('app'));
