@@ -210,11 +210,12 @@ func Stats(w http.ResponseWriter, r *http.Request) {
 		totalMem += mem
 		resources[n.ID] = map[string]any{"cores": cpu, "memory": mem}
 	}
+	cpuU, memU, memUsed, diskU, diskUsed, diskTotal := getAgentStats()
 	json200(w, map[string]any{
 		"resources": resources,
-		"cpu":    map[string]any{"usage": 0, "cores": totalCPU},
-		"memory": map[string]any{"usage": 0, "used": 0, "total": totalMem},
-		"disk":   map[string]any{"usage": 0, "used": 0, "total": 0},
+		"cpu":    map[string]any{"usage": cpuU, "cores": totalCPU},
+		"memory": map[string]any{"usage": memU, "used": memUsed, "total": totalMem},
+		"disk":   map[string]any{"usage": diskU, "used": diskUsed, "total": diskTotal},
 	})
 }
 
