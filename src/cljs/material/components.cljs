@@ -199,9 +199,9 @@
 
 ;; Light theme props
 (def light-theme-props
-  {:palette     {:primary   {:main         "#65519f"
-                             :light        "#957ed1"
-                             :dark         "#362870"
+  {:palette     {:primary   {:main         "#1565C0"
+                             :light        "#42A5F5"
+                             :dark         "#0D47A1"
                              :contrastText "#fff"}
                  :secondary {:main "#8B9F51"}}
    :overrides   theme-overrides
@@ -210,9 +210,9 @@
 ;; Dark theme props
 (def dark-theme-props
   {:palette     {:type      "dark"
-                 :primary   {:main         "#65519f"
-                             :light        "#957ed1"
-                             :dark         "#362870"
+                 :primary   {:main         "#1565C0"
+                             :light        "#42A5F5"
+                             :dark         "#0D47A1"
                              :contrastText "#fff"}
                  :secondary {:main "#aed581"}
                  :background {:default "#000000"

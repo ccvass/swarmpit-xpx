@@ -13,7 +13,7 @@
             [goog.string :as gstring]
             [rum.core :as rum]))
 
-(def swarmpit-home-page "https://swarmpit.io")
+(def swarmpit-home-page "https://github.com/ccvass/swarmpit-xpx")
 
 (defn parse-version [version]
   (clojure.string/replace
