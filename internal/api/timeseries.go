@@ -134,7 +134,6 @@ func extractServiceName(taskName string) string {
 func getHostTimeseries() []map[string]any {
 	tsStore.RLock()
 	defer tsStore.RUnlock()
-	// Resolve node IDs to hostnames
 	nodes, _ := docker.Nodes()
 	hostnames := map[string]string{}
 	for _, n := range nodes {
@@ -145,11 +144,11 @@ func getHostTimeseries() []map[string]any {
 		if len(points) == 0 { continue }
 		name := hostnames[host]
 		if name == "" { name = host }
-		times := make([]int64, len(points))
+		times := make([]string, len(points))
 		cpus := make([]float64, len(points))
 		mems := make([]float64, len(points))
 		for i, p := range points {
-			times[i] = p.Ts * 1000
+			times[i] = time.Unix(p.Ts, 0).Format(time.RFC3339)
 			cpus[i] = p.CPU
 			mems[i] = p.Memory
 		}
@@ -167,13 +166,13 @@ func getServiceTimeseries(sortBy string) []map[string]any {
 	var result []map[string]any
 	for svc, points := range tsStore.services {
 		if len(points) == 0 { continue }
-		times := make([]int64, len(points))
+		times := make([]string, len(points))
 		cpus := make([]float64, len(points))
 		mems := make([]float64, len(points))
 		for i, p := range points {
-			times[i] = p.Ts * 1000
+			times[i] = time.Unix(p.Ts, 0).Format(time.RFC3339)
 			cpus[i] = p.CPU
-			mems[i] = p.Memory / (1024 * 1024) // bytes to MiB
+			mems[i] = p.Memory / (1024 * 1024)
 		}
 		result = append(result, map[string]any{
 			"service": svc, "task": nil, "time": times, "cpu": cpus, "memory": mems,
@@ -188,11 +187,11 @@ func getTaskTimeseries(taskName string) []map[string]any {
 	defer tsStore.RUnlock()
 	points, ok := tsStore.tasks[taskName]
 	if !ok || len(points) == 0 { return []map[string]any{} }
-	times := make([]int64, len(points))
+	times := make([]string, len(points))
 	cpus := make([]float64, len(points))
 	mems := make([]float64, len(points))
 	for i, p := range points {
-		times[i] = p.Ts * 1000
+		times[i] = time.Unix(p.Ts, 0).Format(time.RFC3339)
 		cpus[i] = p.CPU
 		mems[i] = p.Memory / (1024 * 1024)
 	}
