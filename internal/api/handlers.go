@@ -95,56 +95,40 @@ func Initialize(w http.ResponseWriter, r *http.Request) {
 
 func NodeList(w http.ResponseWriter, r *http.Request) {
 	nodes, err := docker.Nodes()
-	if err != nil {
-		jsonErr(w, 500, err.Error())
-		return
-	}
-	json200(w, nodes)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, mapNodes(nodes))
 }
 
 func NodeInfo(w http.ResponseWriter, r *http.Request) {
 	node, err := docker.Node(chi.URLParam(r, "id"))
-	if err != nil {
-		jsonErr(w, 404, err.Error())
-		return
-	}
-	json200(w, node)
+	if err != nil { jsonErr(w, 404, err.Error()); return }
+	json200(w, mapNode(node))
 }
 
 func ServiceList(w http.ResponseWriter, r *http.Request) {
 	svcs, err := docker.Services()
-	if err != nil {
-		jsonErr(w, 500, err.Error())
-		return
-	}
-	json200(w, svcs)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	tasks, _ := docker.Tasks()
+	json200(w, mapServices(svcs, tasks))
 }
 
 func ServiceInfo(w http.ResponseWriter, r *http.Request) {
 	svc, err := docker.Service(chi.URLParam(r, "id"))
-	if err != nil {
-		jsonErr(w, 404, err.Error())
-		return
-	}
-	json200(w, svc)
+	if err != nil { jsonErr(w, 404, err.Error()); return }
+	tasks, _ := docker.Tasks()
+	json200(w, mapService(svc, tasks))
 }
 
 func TaskList(w http.ResponseWriter, r *http.Request) {
 	tasks, err := docker.Tasks()
-	if err != nil {
-		jsonErr(w, 500, err.Error())
-		return
-	}
-	json200(w, tasks)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, mapTasks(tasks))
 }
 
 func NetworkList(w http.ResponseWriter, r *http.Request) {
 	nets, err := docker.Networks()
-	if err != nil {
-		jsonErr(w, 500, err.Error())
-		return
-	}
-	json200(w, nets)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, mapNetworks(nets))
 }
 
 func SecretList(w http.ResponseWriter, r *http.Request) {
