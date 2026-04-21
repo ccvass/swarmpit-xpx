@@ -367,7 +367,7 @@ func NetworkInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	id := chi.URLParam(r, "id")
 	for _, n := range nets {
-		if n.ID == id {
+		if n.ID == id || n.Name == id {
 			json200(w, mapNetwork(n))
 			return
 		}
@@ -393,7 +393,7 @@ func SecretInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	id := chi.URLParam(r, "id")
 	for _, s := range secrets {
-		if s.ID == id {
+		if s.ID == id || s.Spec.Name == id {
 			json200(w, mapSecret(s))
 			return
 		}
@@ -406,7 +406,7 @@ func ConfigInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	id := chi.URLParam(r, "id")
 	for _, c := range configs {
-		if c.ID == id {
+		if c.ID == id || c.Spec.Name == id {
 			json200(w, mapConfig(c))
 			return
 		}
@@ -472,4 +472,129 @@ func GitDeploy(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO: implement git clone + stack deploy
 	json200(w, map[string]string{"status": "not implemented yet"})
+}
+
+// Node tasks
+func NodeTasks(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	tasks, _ := docker.Tasks()
+	nodes, _ := docker.Nodes()
+	svcs, _ := docker.Services()
+	info, _ := docker.Info()
+	var result []map[string]any
+	for _, t := range tasks {
+		if t.NodeID == id { result = append(result, mapTask(t, nodes, svcs, info)) }
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+// Resource-linked services
+func NetworkServices(w http.ResponseWriter, r *http.Request) { linkedServices(w, r, "network") }
+func VolumeServices(w http.ResponseWriter, r *http.Request)  { linkedServices(w, r, "volume") }
+func SecretServices(w http.ResponseWriter, r *http.Request)  { linkedServices(w, r, "secret") }
+func ConfigServices(w http.ResponseWriter, r *http.Request)  { linkedServices(w, r, "config") }
+
+func linkedServices(w http.ResponseWriter, r *http.Request, resType string) {
+	id := chi.URLParam(r, "id")
+	svcs, _ := docker.Services()
+	tasks, _ := docker.Tasks()
+	nets, _ := docker.Networks()
+	info, _ := docker.Info()
+	var result []map[string]any
+	for _, s := range svcs {
+		spec := s.Spec
+		match := false
+		switch resType {
+		case "network":
+			for _, n := range spec.TaskTemplate.Networks {
+				if n.Target == id { match = true; break }
+			}
+			// Also check by name
+			if !match {
+				for _, n := range nets {
+					if n.Name == id {
+						for _, sn := range spec.TaskTemplate.Networks {
+							if sn.Target == n.ID { match = true; break }
+						}
+					}
+				}
+			}
+		case "volume":
+			for _, m := range spec.TaskTemplate.ContainerSpec.Mounts {
+				if string(m.Type) == "volume" && m.Source == id { match = true; break }
+			}
+		case "secret":
+			for _, sec := range spec.TaskTemplate.ContainerSpec.Secrets {
+				if sec.SecretID == id || sec.SecretName == id { match = true; break }
+			}
+		case "config":
+			for _, cfg := range spec.TaskTemplate.ContainerSpec.Configs {
+				if cfg.ConfigID == id || cfg.ConfigName == id { match = true; break }
+			}
+		}
+		if match { result = append(result, mapService(s, tasks, nets, info)) }
+	}
+	if result == nil { result = []map[string]any{} }
+	json200(w, result)
+}
+
+// Service sub-resources
+func ServiceNetworks(w http.ResponseWriter, r *http.Request) {
+	svc, err := docker.Service(chi.URLParam(r, "id"))
+	if err != nil { json200(w, []any{}); return }
+	nets, _ := docker.Networks()
+	netMap := map[string]any{}
+	for _, n := range nets { netMap[n.ID] = mapNetwork(n) }
+	var result []any
+	for _, n := range svc.Spec.TaskTemplate.Networks {
+		if v, ok := netMap[n.Target]; ok { result = append(result, v) }
+	}
+	if result == nil { result = []any{} }
+	json200(w, result)
+}
+
+func ServiceCompose(w http.ResponseWriter, r *http.Request) {
+	json200(w, map[string]string{"compose": ""})
+}
+
+// Timeseries (empty — no historical data in Go backend yet)
+func ServicesTsCPU(w http.ResponseWriter, r *http.Request)    { json200(w, []any{}) }
+func ServicesTsMemory(w http.ResponseWriter, r *http.Request) { json200(w, []any{}) }
+func TaskTimeseries(w http.ResponseWriter, r *http.Request)   { json200(w, []any{}) }
+
+// Plugins and placement
+func LabelsService(w http.ResponseWriter, r *http.Request) {
+	svcs, _ := docker.Services()
+	labels := map[string]bool{}
+	for _, s := range svcs {
+		for k := range s.Spec.Labels { labels[k] = true }
+	}
+	result := []string{}
+	for k := range labels { result = append(result, k) }
+	json200(w, result)
+}
+
+func PluginNetwork(w http.ResponseWriter, r *http.Request) {
+	json200(w, []string{"bridge", "host", "overlay", "macvlan"})
+}
+
+func PluginVolume(w http.ResponseWriter, r *http.Request) {
+	json200(w, []string{"local"})
+}
+
+func PluginLog(w http.ResponseWriter, r *http.Request) {
+	json200(w, []string{"json-file", "syslog", "journald", "gelf", "fluentd", "awslogs", "splunk", "none"})
+}
+
+func Placement(w http.ResponseWriter, r *http.Request) {
+	nodes, _ := docker.Nodes()
+	var result []map[string]string
+	for _, n := range nodes {
+		result = append(result, map[string]string{"node": n.Description.Hostname})
+		for k, v := range n.Spec.Labels {
+			result = append(result, map[string]string{"label": k + "=" + v})
+		}
+	}
+	json200(w, result)
 }
