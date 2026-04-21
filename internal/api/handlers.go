@@ -685,9 +685,9 @@ func Placement(w http.ResponseWriter, r *http.Request) {
 	nodes, _ := docker.Nodes()
 	var result []map[string]string
 	for _, n := range nodes {
-		result = append(result, map[string]string{"node": n.Description.Hostname})
+		result = append(result, map[string]string{"rule": "node.hostname == " + n.Description.Hostname})
 		for k, v := range n.Spec.Labels {
-			result = append(result, map[string]string{"label": k + "=" + v})
+			result = append(result, map[string]string{"rule": "node.labels." + k + " == " + v})
 		}
 	}
 	json200(w, result)
