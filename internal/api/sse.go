@@ -302,6 +302,7 @@ func fetchServiceInfoData(idOrName string, info system.Info) map[string]any {
 func fetchNodeInfoData(idOrName string, info system.Info) map[string]any {
 	nd, err := docker.Node(idOrName)
 	if err != nil { return nil }
+	cache := getNodeStatsCache()
 	tasks, _ := docker.Tasks()
 	services, _ := docker.Services()
 	nodes, _ := docker.Nodes()
@@ -313,7 +314,7 @@ func fetchNodeInfoData(idOrName string, info system.Info) map[string]any {
 	}
 	if nodeTasks == nil { nodeTasks = []map[string]any{} }
 	return map[string]any{
-		"node":  mapNode(nd),
+		"node":  mapNodeWithStats(nd, cache[nd.ID]),
 		"tasks": nodeTasks,
 	}
 }
