@@ -198,6 +198,49 @@ func fetchSubscriptionData(sub sseSubscription) any {
 	}
 }
 
+// clusterStats returns aggregated cluster stats (same as dashboard)
+func clusterStats() map[string]any {
+	nodes, _ := docker.Nodes()
+	cache := getNodeStatsCache()
+	totalCPU := 0.0
+	totalMem := int64(0)
+	resources := map[string]map[string]any{}
+	cpuSum, memSum, diskSum := 0.0, 0.0, 0.0
+	memUsed, diskUsed, diskTotal := int64(0), int64(0), int64(0)
+	nc := 0
+	for _, nd := range nodes {
+		if nd.Status.State != "ready" { continue }
+		cpu := float64(nd.Description.Resources.NanoCPUs) / 1e9
+		mem := nd.Description.Resources.MemoryBytes
+		totalCPU += cpu
+		totalMem += mem
+		resources[nd.ID] = map[string]any{"cores": cpu, "memory": mem}
+		if s, ok := cache[nd.ID]; ok {
+			nc++
+			if c, ok := s["cpu"].(map[string]any); ok {
+				if v, ok := c["usedPercentage"].(float64); ok { cpuSum += v }
+			}
+			if m, ok := s["memory"].(map[string]any); ok {
+				if v, ok := m["usedPercentage"].(float64); ok { memSum += v }
+				if v, ok := m["used"].(float64); ok { memUsed += int64(v) }
+			}
+			if d, ok := s["disk"].(map[string]any); ok {
+				if v, ok := d["usedPercentage"].(float64); ok { diskSum += v }
+				if v, ok := d["used"].(float64); ok { diskUsed += int64(v) }
+				if v, ok := d["total"].(float64); ok { diskTotal += int64(v) }
+			}
+		}
+	}
+	cpuAvg, memAvg, diskAvg := 0.0, 0.0, 0.0
+	if nc > 0 { cpuAvg = cpuSum / float64(nc); memAvg = memSum / float64(nc); diskAvg = diskSum / float64(nc) }
+	return map[string]any{
+		"resources": resources,
+		"cpu":    map[string]any{"usage": cpuAvg, "cores": totalCPU},
+		"memory": map[string]any{"usage": memAvg, "used": memUsed, "total": totalMem},
+		"disk":   map[string]any{"usage": diskAvg, "used": diskUsed, "total": diskTotal},
+	}
+}
+
 // extractStacks builds stack list from services (same logic as StackList handler)
 func extractStacks(svcs []swarm.Service, tasks []swarm.Task, nets []types.NetworkResource, info system.Info) []map[string]any {
 	stacks := map[string]bool{}
@@ -295,6 +338,7 @@ func fetchServiceInfoData(idOrName string, info system.Info) map[string]any {
 		"service":  mapService(svc, tasks, networks, info),
 		"tasks":    svcTasks,
 		"networks": svcNets,
+		"stats":    clusterStats(),
 	}
 }
 
