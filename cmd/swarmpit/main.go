@@ -27,6 +27,8 @@ func main() {
 	ping, _ := docker.Ping()
 	slog.Info("docker connected", "api", ping.APIVersion)
 
+	api.InitTimeseries()
+
 	publicDir := envOr("SWARMPIT_PUBLIC_DIR", "resources/public")
 	port := envOr("PORT", "8080")
 	router := api.NewRouter(os.DirFS(publicDir))

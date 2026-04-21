@@ -1,14 +1,18 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
 	"github.com/ccvass/swarmpit-xpx/internal/docker"
 	"github.com/ccvass/swarmpit-xpx/internal/store"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -30,9 +34,14 @@ func Version(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.ParseFloat(ping.APIVersion, 64); err == nil {
 		apiVer = v
 	}
+	instanceName := os.Getenv("SWARMPIT_INSTANCE_NAME")
+	var instVal any = nil
+	if instanceName != "" {
+		instVal = instanceName
+	}
 	json200(w, map[string]any{
 		"name": "swarmpit-xpx", "version": "2.2.0", "revision": nil,
-		"initialized": store.AdminExists(), "statistics": true, "instanceName": nil,
+		"initialized": store.AdminExists(), "statistics": true, "instanceName": instVal,
 		"docker": map[string]any{"api": apiVer, "engine": ver.Version},
 	})
 }
@@ -682,4 +691,261 @@ func Placement(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json200(w, result)
+}
+
+// ── CRUD handlers (#36) ──
+
+func ServiceCreate(w http.ResponseWriter, r *http.Request) {
+	var spec swarm.ServiceSpec
+	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+		jsonErr(w, 400, "invalid service spec: "+err.Error())
+		return
+	}
+	resp, err := docker.CreateService(spec)
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": resp.ID})
+}
+
+func ServiceUpdate(w http.ResponseWriter, r *http.Request) {
+	id := resolveServiceID(chi.URLParam(r, "id"))
+	svc, err := docker.Service(id)
+	if err != nil {
+		jsonErr(w, 404, "service not found")
+		return
+	}
+	var spec swarm.ServiceSpec
+	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+		jsonErr(w, 400, "invalid service spec: "+err.Error())
+		return
+	}
+	if err := docker.UpdateService(id, svc.Version, spec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+func StackCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+		Spec string `json:"spec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" || body.Spec == "" {
+		jsonErr(w, 400, "name and spec (YAML) required")
+		return
+	}
+	out, err := deployStack(body.Name, body.Spec)
+	if err != nil {
+		jsonErr(w, 500, out)
+		return
+	}
+	json200(w, map[string]string{"status": "deployed", "output": out})
+}
+
+func StackUpdate(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	var body struct {
+		Spec string `json:"spec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Spec == "" {
+		jsonErr(w, 400, "spec (YAML) required")
+		return
+	}
+	out, err := deployStack(name, body.Spec)
+	if err != nil {
+		jsonErr(w, 500, out)
+		return
+	}
+	json200(w, map[string]string{"status": "updated", "output": out})
+}
+
+func deployStack(name, spec string) (string, error) {
+	cmd := exec.Command("docker", "stack", "deploy", "-c", "-", name)
+	cmd.Stdin = strings.NewReader(spec)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func StackDelete(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	out, err := exec.Command("docker", "stack", "rm", name).CombinedOutput()
+	if err != nil {
+		jsonErr(w, 500, string(out))
+		return
+	}
+	json200(w, map[string]string{"status": "removed", "output": string(out)})
+}
+
+func NetworkCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		NetworkName string `json:"networkName"`
+		Driver      string `json:"driver"`
+		Internal    bool   `json:"internal"`
+		Attachable  bool   `json:"attachable"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.NetworkName == "" {
+		jsonErr(w, 400, "networkName required")
+		return
+	}
+	if body.Driver == "" {
+		body.Driver = "overlay"
+	}
+	resp, err := docker.CreateNetwork(body.NetworkName, body.Driver, body.Internal, body.Attachable)
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": resp.ID})
+}
+
+func VolumeCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		VolumeName string `json:"volumeName"`
+		Driver     string `json:"driver"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.VolumeName == "" {
+		jsonErr(w, 400, "volumeName required")
+		return
+	}
+	if body.Driver == "" {
+		body.Driver = "local"
+	}
+	v, err := docker.CreateVolume(body.VolumeName, body.Driver)
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"name": v.Name})
+}
+
+func SecretCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SecretName string `json:"secretName"`
+		Data       string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.SecretName == "" {
+		jsonErr(w, 400, "secretName required")
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(body.Data)
+	if err != nil {
+		jsonErr(w, 400, "data must be base64 encoded")
+		return
+	}
+	resp, err := docker.CreateSecret(swarm.SecretSpec{
+		Annotations: swarm.Annotations{Name: body.SecretName},
+		Data:        data,
+	})
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": resp.ID})
+}
+
+func ConfigCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ConfigName string `json:"configName"`
+		Data       string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ConfigName == "" {
+		jsonErr(w, 400, "configName required")
+		return
+	}
+	resp, err := docker.CreateConfig(swarm.ConfigSpec{
+		Annotations: swarm.Annotations{Name: body.ConfigName},
+		Data:        []byte(body.Data),
+	})
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": resp.ID})
+}
+
+func SecretUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	sec, err := docker.SecretInspect(id)
+	if err != nil {
+		jsonErr(w, 404, "secret not found")
+		return
+	}
+	var body struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, 400, "invalid body")
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(body.Data)
+	if err != nil {
+		jsonErr(w, 400, "data must be base64 encoded")
+		return
+	}
+	sec.Spec.Data = data
+	if err := docker.UpdateSecret(id, sec.Version, sec.Spec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+func ConfigUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	cfg, err := docker.ConfigInspect(id)
+	if err != nil {
+		jsonErr(w, 404, "config not found")
+		return
+	}
+	var body struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, 400, "invalid body")
+		return
+	}
+	cfg.Spec.Data = []byte(body.Data)
+	if err := docker.UpdateConfig(id, cfg.Version, cfg.Spec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+// ── Redeploy & Rollback (#37) ──
+
+func ServiceRedeploy(w http.ResponseWriter, r *http.Request) {
+	id := resolveServiceID(chi.URLParam(r, "id"))
+	svc, err := docker.Service(id)
+	if err != nil {
+		jsonErr(w, 404, "service not found")
+		return
+	}
+	svc.Spec.TaskTemplate.ForceUpdate++
+	if err := docker.UpdateService(id, svc.Version, svc.Spec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "redeployed"})
+}
+
+func ServiceRollback(w http.ResponseWriter, r *http.Request) {
+	id := resolveServiceID(chi.URLParam(r, "id"))
+	svc, err := docker.Service(id)
+	if err != nil {
+		jsonErr(w, 404, "service not found")
+		return
+	}
+	if svc.PreviousSpec == nil {
+		jsonErr(w, 400, "no previous spec available for rollback")
+		return
+	}
+	if err := docker.UpdateService(id, svc.Version, *svc.PreviousSpec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "rolled back"})
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
@@ -211,4 +212,68 @@ func DeleteNetwork(id string) error {
 	ctx, cancel := withTimeout()
 	defer cancel()
 	return cli.NetworkRemove(ctx, id)
+}
+
+func CreateService(spec swarm.ServiceSpec) (swarm.ServiceCreateResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ServiceCreate(ctx, spec, types.ServiceCreateOptions{})
+}
+
+func CreateNetwork(name, driver string, internal, attachable bool) (network.CreateResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.NetworkCreate(ctx, name, network.CreateOptions{
+		Driver:     driver,
+		Attachable: attachable,
+		Internal:   internal,
+	})
+}
+
+func CreateVolume(name, driver string) (*volume.Volume, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	v, err := cli.VolumeCreate(ctx, volume.CreateOptions{Name: name, Driver: driver})
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func CreateSecret(spec swarm.SecretSpec) (types.SecretCreateResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.SecretCreate(ctx, spec)
+}
+
+func CreateConfig(spec swarm.ConfigSpec) (types.ConfigCreateResponse, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ConfigCreate(ctx, spec)
+}
+
+func SecretInspect(id string) (swarm.Secret, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	s, _, err := cli.SecretInspectWithRaw(ctx, id)
+	return s, err
+}
+
+func ConfigInspect(id string) (swarm.Config, error) {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	c, _, err := cli.ConfigInspectWithRaw(ctx, id)
+	return c, err
+}
+
+func UpdateSecret(id string, version swarm.Version, spec swarm.SecretSpec) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.SecretUpdate(ctx, id, version, spec)
+}
+
+func UpdateConfig(id string, version swarm.Version, spec swarm.ConfigSpec) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.ConfigUpdate(ctx, id, version, spec)
 }

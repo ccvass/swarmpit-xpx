@@ -12,8 +12,10 @@ import (
 )
 
 var db *sql.DB
+var dbDir string
 
 func Init(dbPath string) error {
+	dbDir = dbPath
 	os.MkdirAll(dbPath, 0755)
 	var err error
 	db, err = sql.Open("sqlite3", filepath.Join(dbPath, "swarmpit.db"))
@@ -34,6 +36,9 @@ func Init(dbPath string) error {
 		CREATE TABLE IF NOT EXISTS audit_log (
 			id TEXT PRIMARY KEY, timestamp INTEGER DEFAULT (strftime('%s','now')),
 			username TEXT, action TEXT, resource_type TEXT, resource_name TEXT
+		);
+		CREATE TABLE IF NOT EXISTS stats_ts (
+			node_id TEXT, ts INTEGER, cpu REAL, memory REAL, disk REAL
 		);
 	`)
 	if err != nil {
@@ -160,4 +165,50 @@ func SaveDoc(docType, id string, data any) error {
 	j, _ := json.Marshal(data)
 	_, err := db.Exec("INSERT OR REPLACE INTO documents (id, type, data) VALUES (?,?,?)", id, docType, string(j))
 	return err
+}
+
+// Timeseries persistence
+
+type TsRow struct {
+	NodeID string
+	Ts     int64
+	CPU    float64
+	Memory float64
+	Disk   float64
+}
+
+func LoadTimeseries() ([]TsRow, error) {
+	rows, err := db.Query("SELECT node_id, ts, cpu, memory, disk FROM stats_ts ORDER BY ts ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []TsRow
+	for rows.Next() {
+		var r TsRow
+		rows.Scan(&r.NodeID, &r.Ts, &r.CPU, &r.Memory, &r.Disk)
+		result = append(result, r)
+	}
+	return result, nil
+}
+
+func SaveTimeseries(rows []TsRow) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("INSERT INTO stats_ts (node_id, ts, cpu, memory, disk) VALUES (?,?,?,?,?)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range rows {
+		stmt.Exec(r.NodeID, r.Ts, r.CPU, r.Memory, r.Disk)
+	}
+	return tx.Commit()
+}
+
+func PruneTimeseries(before int64) {
+	db.Exec("DELETE FROM stats_ts WHERE ts < ?", before)
 }
