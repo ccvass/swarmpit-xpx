@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"io/fs"
 	"net/http"
@@ -16,9 +17,17 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("X-Backend-Server", "swarmpit")
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, req)
+		})
+	})
+	// Inject router into context for swagger route generation
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+			ctx = context.WithValue(ctx, chiRouterKey, r)
+			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	})
 
@@ -32,6 +41,8 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Get("/version", Version)
 	r.Get("/health/live", HealthLive)
 	r.Get("/health/ready", HealthReady)
+	r.Get("/api-docs", SwaggerUI)
+	r.Get("/api-docs/swagger.json", SwaggerJSON)
 	r.Post("/login", Login)
 	r.Post("/initialize", Initialize)
 	r.Post("/api/webhooks/{token}", WebhookTrigger)
@@ -129,6 +140,19 @@ func NewRouter(staticFS fs.FS) http.Handler {
 
 		r.Post("/api/services/{id}/dashboard", DashboardPinService)
 		r.Post("/api/nodes/{id}/dashboard", DashboardPinNode)
+
+		r.Get("/api/alerts", AlertRuleList)
+		r.Post("/api/alerts", AlertRuleCreate)
+		r.Put("/api/alerts/{id}", AlertRuleUpdate)
+		r.Delete("/api/alerts/{id}", AlertRuleDelete)
+		r.Get("/api/alerts/history", AlertHistoryList)
+
+		r.Get("/api/templates", TemplateList)
+		r.Post("/api/templates", TemplateCreate)
+		r.Post("/api/templates/{id}/deploy", TemplateDeploy)
+		r.Delete("/api/templates/{id}", TemplateDelete)
+
+		r.Post("/api/compose/validate", ComposeValidate)
 
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)

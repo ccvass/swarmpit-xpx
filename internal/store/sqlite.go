@@ -49,6 +49,16 @@ func Init(dbPath string) error {
 			username TEXT, resource_type TEXT, resource_id TEXT,
 			PRIMARY KEY(username, resource_type, resource_id)
 		);
+		CREATE TABLE IF NOT EXISTS alert_rules (
+			id TEXT PRIMARY KEY, type TEXT, condition TEXT, threshold REAL,
+			channel TEXT, target TEXT, enabled INTEGER DEFAULT 1
+		);
+		CREATE TABLE IF NOT EXISTS alert_history (
+			id TEXT PRIMARY KEY, rule_id TEXT, message TEXT, created_at TEXT
+		);
+		CREATE TABLE IF NOT EXISTS templates (
+			id TEXT PRIMARY KEY, name TEXT, description TEXT, spec TEXT, created_at TEXT
+		);
 	`)
 	if err != nil {
 		return err
@@ -371,5 +381,93 @@ func ListWebhooks() []map[string]any {
 
 func DeleteWebhook(id string) error {
 	_, err := db.Exec("DELETE FROM webhooks WHERE id = ?", id)
+	return err
+}
+
+// ── Alert rules CRUD ──
+
+func ListAlertRules() []map[string]any {
+	rows, err := db.Query("SELECT id, type, condition, threshold, channel, target, enabled FROM alert_rules")
+	if err != nil { return []map[string]any{} }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, typ, cond, ch, tgt string
+		var threshold float64
+		var enabled int
+		rows.Scan(&id, &typ, &cond, &threshold, &ch, &tgt, &enabled)
+		result = append(result, map[string]any{"id": id, "type": typ, "condition": cond, "threshold": threshold, "channel": ch, "target": tgt, "enabled": enabled == 1})
+	}
+	if result == nil { result = []map[string]any{} }
+	return result
+}
+
+func CreateAlertRule(typ, cond string, threshold float64, ch, tgt string) map[string]any {
+	id := uuid.NewString()
+	db.Exec("INSERT INTO alert_rules (id, type, condition, threshold, channel, target, enabled) VALUES (?,?,?,?,?,?,1)", id, typ, cond, threshold, ch, tgt)
+	return map[string]any{"id": id, "type": typ, "condition": cond, "threshold": threshold, "channel": ch, "target": tgt, "enabled": true}
+}
+
+func UpdateAlertRule(id string, typ, cond string, threshold float64, ch, tgt string, enabled bool) error {
+	e := 0; if enabled { e = 1 }
+	_, err := db.Exec("UPDATE alert_rules SET type=?, condition=?, threshold=?, channel=?, target=?, enabled=? WHERE id=?", typ, cond, threshold, ch, tgt, e, id)
+	return err
+}
+
+func DeleteAlertRule(id string) error {
+	_, err := db.Exec("DELETE FROM alert_rules WHERE id=?", id)
+	return err
+}
+
+func ListAlertHistory() []map[string]any {
+	rows, err := db.Query("SELECT id, rule_id, message, created_at FROM alert_history ORDER BY created_at DESC LIMIT 100")
+	if err != nil { return []map[string]any{} }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, ruleID, msg, createdAt string
+		rows.Scan(&id, &ruleID, &msg, &createdAt)
+		result = append(result, map[string]any{"id": id, "rule_id": ruleID, "message": msg, "created_at": createdAt})
+	}
+	if result == nil { result = []map[string]any{} }
+	return result
+}
+
+func RecordAlertHistory(ruleID, message string) {
+	db.Exec("INSERT INTO alert_history (id, rule_id, message, created_at) VALUES (?,?,?,?)", uuid.NewString(), ruleID, message, time.Now().UTC().Format(time.RFC3339))
+}
+
+// ── Templates CRUD ──
+
+func ListTemplates() []map[string]any {
+	rows, err := db.Query("SELECT id, name, description, spec, created_at FROM templates ORDER BY created_at DESC")
+	if err != nil { return []map[string]any{} }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, name, desc, spec, createdAt string
+		rows.Scan(&id, &name, &desc, &spec, &createdAt)
+		result = append(result, map[string]any{"id": id, "name": name, "description": desc, "spec": spec, "created_at": createdAt})
+	}
+	if result == nil { result = []map[string]any{} }
+	return result
+}
+
+func CreateTemplate(name, desc, spec string) map[string]any {
+	id := uuid.NewString()
+	now := time.Now().UTC().Format(time.RFC3339)
+	db.Exec("INSERT INTO templates (id, name, description, spec, created_at) VALUES (?,?,?,?,?)", id, name, desc, spec, now)
+	return map[string]any{"id": id, "name": name, "description": desc, "spec": spec, "created_at": now}
+}
+
+func GetTemplate(id string) (map[string]any, error) {
+	var name, desc, spec, createdAt string
+	err := db.QueryRow("SELECT name, description, spec, created_at FROM templates WHERE id=?", id).Scan(&name, &desc, &spec, &createdAt)
+	if err != nil { return nil, err }
+	return map[string]any{"id": id, "name": name, "description": desc, "spec": spec, "created_at": createdAt}, nil
+}
+
+func DeleteTemplate(id string) error {
+	_, err := db.Exec("DELETE FROM templates WHERE id=?", id)
 	return err
 }

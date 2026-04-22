@@ -28,6 +28,7 @@ func main() {
 	slog.Info("docker connected", "api", ping.APIVersion)
 
 	api.InitTimeseries()
+	api.StartAlertChecker()
 
 	publicDir := envOr("SWARMPIT_PUBLIC_DIR", "resources/public")
 	port := envOr("PORT", "8080")

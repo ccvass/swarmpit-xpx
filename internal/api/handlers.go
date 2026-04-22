@@ -1,19 +1,27 @@
 package api
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
 	"github.com/ccvass/swarmpit-xpx/internal/docker"
 	"github.com/ccvass/swarmpit-xpx/internal/store"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/docker/client"
 	"github.com/go-chi/chi/v5"
+	"gopkg.in/yaml.v3"
 )
 
 func json200(w http.ResponseWriter, v any) {
@@ -509,7 +517,29 @@ func resolveNodeID(id string) string {
 }
 
 func ServiceLogs(w http.ResponseWriter, r *http.Request) {
-	logs, err := docker.ServiceLogs(resolveServiceID(chi.URLParam(r, "id")), r.URL.Query().Get("tail"))
+	svcID := resolveServiceID(chi.URLParam(r, "id"))
+	if r.URL.Query().Get("follow") == "true" {
+		flusher, ok := w.(http.Flusher)
+		if !ok { jsonErr(w, 500, "streaming not supported"); return }
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil { jsonErr(w, 500, err.Error()); return }
+		reader, err := cli.ServiceLogs(r.Context(), svcID, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "50", Timestamps: true})
+		if err != nil { jsonErr(w, 500, err.Error()); return }
+		defer reader.Close()
+		buf := make([]byte, 4096)
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(string(buf[:n])))
+				flusher.Flush()
+			}
+			if err != nil { return }
+		}
+	}
+	logs, err := docker.ServiceLogs(svcID, r.URL.Query().Get("tail"))
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	json200(w, map[string]string{"logs": logs})
 }
@@ -538,10 +568,41 @@ func WebhookTrigger(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	svcID, ok := store.FindWebhook(token)
 	if !ok { jsonErr(w, 404, "Webhook not found"); return }
+
+	// Parse body to detect image info for auto-deploy (#61)
+	var body map[string]any
+	json.NewDecoder(r.Body).Decode(&body)
+	webhookImage := ""
+	if pd, ok := body["push_data"].(map[string]any); ok {
+		if repo, ok := body["repository"].(map[string]any); ok {
+			tag, _ := pd["tag"].(string)
+			repoName, _ := repo["repo_name"].(string)
+			if repoName != "" && tag != "" { webhookImage = repoName + ":" + tag }
+		}
+	} else if img, ok := body["image"].(string); ok && img != "" {
+		webhookImage = img
+	}
+
+	// If image detected, find and update all services using it
+	if webhookImage != "" {
+		svcs, _ := docker.Services()
+		for _, s := range svcs {
+			svcImg := s.Spec.TaskTemplate.ContainerSpec.Image
+			imgBase := strings.SplitN(svcImg, "@", 2)[0]
+			if imgBase == webhookImage || strings.HasPrefix(imgBase, webhookImage) {
+				s.Spec.TaskTemplate.ForceUpdate++
+				docker.UpdateService(s.ID, s.Version, s.Spec)
+				store.RecordAudit("webhook", "auto-deploy", "service", s.Spec.Name)
+			}
+		}
+	}
+
+	// Always force-update the webhook's own service
 	svc, err := docker.Service(svcID)
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	svc.Spec.TaskTemplate.ForceUpdate++
 	if err := docker.UpdateService(svcID, svc.Version, svc.Spec); err != nil { jsonErr(w, 500, err.Error()); return }
+	store.RecordAudit("webhook", "trigger", "service", svc.Spec.Name)
 	json200(w, map[string]string{"status": "triggered"})
 }
 
@@ -1244,3 +1305,184 @@ func DashboardPinNode(w http.ResponseWriter, r *http.Request) {
 	pinned := store.TogglePin(r.Header.Get("X-User"), "node", chi.URLParam(r, "id"))
 	json200(w, map[string]bool{"pinned": pinned})
 }
+
+// ── #52 Swagger/OpenAPI docs ──
+
+func SwaggerUI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<!DOCTYPE html><html><head><title>Swarmpit XPX API</title>
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head><body><div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({url:"/api-docs/swagger.json",dom_id:"#swagger-ui"})</script>
+</body></html>`))
+}
+
+func SwaggerJSON(w http.ResponseWriter, r *http.Request) {
+	paths := map[string]any{}
+	chi.Walk(r.Context().Value(chiRouterKey).(chi.Router), func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		if _, ok := paths[route]; !ok { paths[route] = map[string]any{} }
+		paths[route].(map[string]any)[strings.ToLower(method)] = map[string]any{
+			"summary": method + " " + route, "responses": map[string]any{"200": map[string]string{"description": "OK"}},
+		}
+		return nil
+	})
+	json200(w, map[string]any{
+		"openapi": "3.0.0",
+		"info":    map[string]string{"title": "Swarmpit XPX API", "version": "2.2.0"},
+		"paths":   paths,
+	})
+}
+
+type ctxKey string
+
+const chiRouterKey ctxKey = "chiRouter"
+
+// ── #54 Alerting ──
+
+func AlertRuleList(w http.ResponseWriter, r *http.Request) { json200(w, store.ListAlertRules()) }
+
+func AlertRuleCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Type      string  `json:"type"`
+		Condition string  `json:"condition"`
+		Threshold float64 `json:"threshold"`
+		Channel   string  `json:"channel"`
+		Target    string  `json:"target"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Type == "" {
+		jsonErr(w, 400, "type required"); return
+	}
+	json200(w, store.CreateAlertRule(body.Type, body.Condition, body.Threshold, body.Channel, body.Target))
+}
+
+func AlertRuleUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		Type      string  `json:"type"`
+		Condition string  `json:"condition"`
+		Threshold float64 `json:"threshold"`
+		Channel   string  `json:"channel"`
+		Target    string  `json:"target"`
+		Enabled   bool    `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil { jsonErr(w, 400, "invalid body"); return }
+	if err := store.UpdateAlertRule(id, body.Type, body.Condition, body.Threshold, body.Channel, body.Target, body.Enabled); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+func AlertRuleDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteAlertRule(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+func AlertHistoryList(w http.ResponseWriter, r *http.Request) { json200(w, store.ListAlertHistory()) }
+
+// StartAlertChecker runs background alert evaluation every 30s
+func StartAlertChecker() {
+	go func() {
+		for {
+			time.Sleep(30 * time.Second)
+			checkAlerts()
+		}
+	}()
+}
+
+func checkAlerts() {
+	rules := store.ListAlertRules()
+	cache := getNodeStatsCache()
+	for _, rule := range rules {
+		enabled, _ := rule["enabled"].(bool)
+		if !enabled { continue }
+		typ, _ := rule["type"].(string)
+		threshold, _ := rule["threshold"].(float64)
+		channel, _ := rule["channel"].(string)
+		target, _ := rule["target"].(string)
+		ruleID, _ := rule["id"].(string)
+
+		for nodeID, stats := range cache {
+			var val float64
+			switch typ {
+			case "cpu_high":
+				if c, ok := stats["cpu"].(map[string]any); ok { val, _ = c["usedPercentage"].(float64) }
+			case "memory_high":
+				if m, ok := stats["memory"].(map[string]any); ok { val, _ = m["usedPercentage"].(float64) }
+			case "disk_high":
+				if d, ok := stats["disk"].(map[string]any); ok { val, _ = d["usedPercentage"].(float64) }
+			}
+			if val > threshold {
+				msg := fmt.Sprintf("%s: node %s at %.1f%% (threshold %.1f%%)", typ, nodeID, val, threshold)
+				store.RecordAlertHistory(ruleID, msg)
+				if channel == "webhook" && target != "" {
+					go sendWebhookAlert(target, msg)
+				}
+			}
+		}
+	}
+}
+
+func sendWebhookAlert(url, msg string) {
+	payload, _ := json.Marshal(map[string]string{"alert": msg, "timestamp": time.Now().UTC().Format(time.RFC3339)})
+	resp, err := http.Post(url, "application/json", bytes.NewReader(payload))
+	if err != nil { slog.Warn("alert webhook failed", "url", url, "err", err); return }
+	resp.Body.Close()
+}
+
+// ── #56 Service templates ──
+
+func TemplateList(w http.ResponseWriter, r *http.Request) { json200(w, store.ListTemplates()) }
+
+func TemplateCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Spec        string `json:"spec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+		jsonErr(w, 400, "name required"); return
+	}
+	json200(w, store.CreateTemplate(body.Name, body.Description, body.Spec))
+}
+
+func TemplateDeploy(w http.ResponseWriter, r *http.Request) {
+	tpl, err := store.GetTemplate(chi.URLParam(r, "id"))
+	if err != nil { jsonErr(w, 404, "template not found"); return }
+	spec, _ := tpl["spec"].(string)
+	var svcSpec swarm.ServiceSpec
+	if err := json.Unmarshal([]byte(spec), &svcSpec); err != nil {
+		jsonErr(w, 400, "invalid template spec: "+err.Error()); return
+	}
+	resp, err := docker.CreateService(svcSpec)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, map[string]string{"id": resp.ID, "status": "deployed"})
+}
+
+func TemplateDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteTemplate(chi.URLParam(r, "id")); err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+// ── #57 Compose editor validation ──
+
+func ComposeValidate(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil { jsonErr(w, 400, "cannot read body"); return }
+	var raw any
+	// Try to parse the body as JSON with a "spec" field first
+	var req struct{ Spec string `json:"spec"` }
+	if json.Unmarshal(body, &req) == nil && req.Spec != "" {
+		body = []byte(req.Spec)
+	}
+	if err := yaml.Unmarshal(body, &raw); err != nil {
+		json200(w, map[string]any{"valid": false, "error": err.Error()}); return
+	}
+	json200(w, map[string]any{"valid": true})
+}
+
+// ── #58 Streaming logs ──
+// ServiceLogs is already defined above — we replace it to support follow=true SSE streaming
+
+// ── #61 Auto-deploy on image push (enhanced WebhookTrigger) ──
+// WebhookTrigger is already defined above — we replace it to parse DockerHub/generic webhook body

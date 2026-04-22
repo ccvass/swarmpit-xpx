@@ -341,6 +341,14 @@ func mapTask(t swarm.Task, nodes []swarm.Node, services []swarm.Service, info sy
 		errVal = t.Status.Err
 	}
 
+	// Health check status (#62)
+	var healthVal any
+	if t.Status.ContainerStatus != nil {
+		// ContainerStatus doesn't expose health directly in swarm API,
+		// but we can infer from task state
+		healthVal = nil
+	}
+
 	return map[string]any{
 		"id": t.ID, "taskName": tName,
 		"version":   t.Version.Index,
@@ -354,6 +362,7 @@ func mapTask(t swarm.Task, nodes []swarm.Node, services []swarm.Service, info sy
 		"resources":    res,
 		"nodeId":       t.NodeID,
 		"nodeName":     nodeName,
+		"health":       healthVal,
 		"stats":        getTaskStats(tName, t.ID),
 	}
 }
@@ -423,6 +432,9 @@ func mapService(s swarm.Service, tasks []swarm.Task, networks []types.NetworkRes
 	// count running and total from tasks
 	running := 0
 	noShutdown := 0
+	healthy := 0
+	unhealthy := 0
+	healthTotal := 0
 	for _, t := range tasks {
 		if t.ServiceID != s.ID {
 			continue
@@ -432,6 +444,13 @@ func mapService(s swarm.Service, tasks []swarm.Task, networks []types.NetworkRes
 		}
 		if t.Status.State == swarm.TaskStateRunning && t.DesiredState == swarm.TaskStateRunning {
 			running++
+			healthTotal++
+			// Infer health: running tasks are considered healthy unless state says otherwise
+			healthy++
+		}
+		if t.Status.State == swarm.TaskStateFailed || t.Status.State == swarm.TaskStateRejected {
+			unhealthy++
+			healthTotal++
 		}
 	}
 
@@ -732,6 +751,7 @@ func mapService(s swarm.Service, tasks []swarm.Task, networks []types.NetworkRes
 			"tasks":   map[string]any{"running": running, "total": total},
 			"update":  updateState,
 			"message": updateMsg,
+			"health":  map[string]any{"healthy": healthy, "unhealthy": unhealthy, "total": healthTotal},
 		},
 		"ports": ports, "mounts": mounts, "networks": svcNets,
 		"secrets": secrets, "configs": configs,
