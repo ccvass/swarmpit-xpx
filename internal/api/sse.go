@@ -161,39 +161,21 @@ func fetchSubscriptionData(sub sseSubscription) any {
 		services, _ := docker.Services()
 		nodes, _ := docker.Nodes()
 		return mapTasks(tasks, nodes, services, info)
-	case "task-info":
-		svcName := sub.Params["serviceName"]
-		if svcName == "" { return nil }
-		return fetchTaskInfoData(svcName, info)
 	case "network-list":
 		networks, _ := docker.Networks()
 		return mapNetworks(networks)
-	case "network-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchNetworkInfoData(id)
 	case "volume-list":
 		vols, _ := docker.Volumes()
 		return mapVolumes(vols.Volumes)
-	case "volume-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchVolumeInfoData(id)
 	case "secret-list":
 		secrets, _ := docker.Secrets()
 		return mapSecrets(secrets)
-	case "secret-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchSecretInfoData(id)
 	case "config-list":
 		configs, _ := docker.Configs()
 		return mapConfigs(configs)
-	case "config-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchConfigInfoData(id)
 	default:
+		// Don't send SSE data for unknown handlers — let API calls handle it
+		// This prevents the frontend :default handler from corrupting form state
 		return nil
 	}
 }
