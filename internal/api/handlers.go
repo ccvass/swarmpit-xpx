@@ -48,7 +48,7 @@ func Version(w http.ResponseWriter, r *http.Request) {
 		instVal = instanceName
 	}
 	json200(w, map[string]any{
-		"name": "swarmpit-xpx", "version": "2.2.0", "revision": nil,
+		"name": "swarmpit-xpx", "version": "2.5.0", "revision": nil,
 		"initialized": store.AdminExists(), "statistics": true, "instanceName": instVal,
 		"docker": map[string]any{"api": apiVer, "engine": ver.Version},
 	})
@@ -1329,7 +1329,7 @@ func SwaggerJSON(w http.ResponseWriter, r *http.Request) {
 	})
 	json200(w, map[string]any{
 		"openapi": "3.0.0",
-		"info":    map[string]string{"title": "Swarmpit XPX API", "version": "2.2.0"},
+		"info":    map[string]string{"title": "Swarmpit XPX API", "version": "2.5.0"},
 		"paths":   paths,
 	})
 }
