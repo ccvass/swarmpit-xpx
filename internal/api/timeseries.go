@@ -210,7 +210,7 @@ func getHostTimeseries() []map[string]any {
 		}
 		name := hostnames[host]
 		if name == "" {
-			name = host
+			continue // skip unresolved container IDs
 		}
 		times := make([]string, len(points))
 		cpus := make([]float64, len(points))

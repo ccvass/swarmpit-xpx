@@ -108,7 +108,7 @@ func SSEHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Periodic refresh ticker
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -196,6 +196,19 @@ func fetchSubscriptionData(sub sseSubscription) any {
 	default:
 		return nil
 	}
+}
+
+// limitTimeseries trims each series to the last N points to reduce SSE payload
+func limitTimeseries(series []map[string]any, maxPoints int) []map[string]any {
+	for i, s := range series {
+		if times, ok := s["time"].([]string); ok && len(times) > maxPoints {
+			offset := len(times) - maxPoints
+			series[i]["time"] = times[offset:]
+			if cpus, ok := s["cpu"].([]float64); ok { series[i]["cpu"] = cpus[offset:] }
+			if mems, ok := s["memory"].([]float64); ok { series[i]["memory"] = mems[offset:] }
+		}
+	}
+	return series
 }
 
 // clusterStats returns aggregated cluster stats (same as dashboard)
@@ -303,9 +316,9 @@ func fetchDashboardData() map[string]any {
 		},
 		"services":           mapServices(services, tasks, networks, info),
 		"nodes":              mapNodes(nodes),
-		"nodes-ts":           getHostTimeseries(),
-		"services-ts-cpu":    getServiceTimeseries("cpu"),
-		"services-ts-memory": getServiceTimeseries("memory"),
+		"nodes-ts":           limitTimeseries(getHostTimeseries(), 100),
+		"services-ts-cpu":    limitTimeseries(getServiceTimeseries("cpu"), 100),
+		"services-ts-memory": limitTimeseries(getServiceTimeseries("memory"), 100),
 	}
 }
 
