@@ -106,6 +106,17 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Post("/api/stacks", StackCreate)
 		r.Put("/api/stacks/{name}", StackUpdate)
 		r.Delete("/api/stacks/{name}", StackDelete)
+		r.Post("/api/stacks/{name}/redeploy", StackRedeploy)
+		r.Post("/api/stacks/{name}/rollback", StackRollback)
+		r.Post("/api/services/{id}/stop", ServiceStop)
+		r.Get("/api/registry/{type}", RegistryList)
+		r.Post("/api/registry/{type}", RegistryCreate)
+		r.Get("/api/registry/{type}/{id}", RegistryInfo)
+		r.Put("/api/registry/{type}/{id}", RegistryUpdate)
+		r.Delete("/api/registry/{type}/{id}", RegistryDelete)
+		r.Get("/api/registry/{type}/{id}/repositories", RegistryRepositories)
+		r.Get("/api/public/repositories", PublicRepositories)
+		r.Get("/api/tags/*", ImageTags)
 		r.Get("/exec/{id}", ExecHandler)
 
 		r.Group(func(r chi.Router) {

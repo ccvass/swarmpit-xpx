@@ -1,0 +1,73 @@
+package api
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+)
+
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
+func searchDockerHub(query string) ([]map[string]any, error) {
+	u := fmt.Sprintf("https://hub.docker.com/v2/search/repositories/?query=%s&page_size=20", url.QueryEscape(query))
+	resp, err := httpClient.Get(u)
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	var data struct {
+		Results []struct {
+			Name      string `json:"repo_name"`
+			Desc      string `json:"short_description"`
+			Stars     int    `json:"star_count"`
+			Official  bool   `json:"is_official"`
+			Automated bool   `json:"is_automated"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { return nil, err }
+	result := make([]map[string]any, len(data.Results))
+	for i, r := range data.Results {
+		result[i] = map[string]any{
+			"name": r.Name, "description": r.Desc,
+			"stars": r.Stars, "official": r.Official, "automated": r.Automated,
+		}
+	}
+	return result, nil
+}
+
+func fetchDockerHubTags(repo string) ([]map[string]any, error) {
+	u := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/tags/?page_size=50", repo)
+	resp, err := httpClient.Get(u)
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	var data struct {
+		Results []struct {
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { return nil, err }
+	result := make([]map[string]any, len(data.Results))
+	for i, r := range data.Results {
+		result[i] = map[string]any{"name": r.Name}
+	}
+	return result, nil
+}
+
+func listRegistryRepos(reg map[string]any) ([]map[string]any, error) {
+	// For v2 registries, call the catalog API
+	regURL, _ := reg["url"].(string)
+	if regURL == "" { return []map[string]any{}, nil }
+	u := fmt.Sprintf("%s/v2/_catalog", regURL)
+	resp, err := httpClient.Get(u)
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	var data struct {
+		Repositories []string `json:"repositories"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { return nil, err }
+	result := make([]map[string]any, len(data.Repositories))
+	for i, r := range data.Repositories {
+		result[i] = map[string]any{"name": r}
+	}
+	return result, nil
+}

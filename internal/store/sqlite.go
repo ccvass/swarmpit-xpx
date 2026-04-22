@@ -3,8 +3,10 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -39,6 +41,9 @@ func Init(dbPath string) error {
 		);
 		CREATE TABLE IF NOT EXISTS stats_ts (
 			node_id TEXT, ts INTEGER, cpu REAL, memory REAL, disk REAL
+		);
+		CREATE TABLE IF NOT EXISTS registries (
+			id TEXT PRIMARY KEY, type TEXT NOT NULL, name TEXT, url TEXT, data TEXT
 		);
 	`)
 	if err != nil {
@@ -211,4 +216,61 @@ func SaveTimeseries(rows []TsRow) error {
 
 func PruneTimeseries(before int64) {
 	db.Exec("DELETE FROM stats_ts WHERE ts < ?", before)
+}
+
+// ── Registry CRUD ──
+
+func ListRegistries(regType string) ([]map[string]any, error) {
+	rows, err := db.Query("SELECT id, type, name, url, data FROM registries WHERE type = ?", regType)
+	if err != nil { return []map[string]any{}, err }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, rtype, name, url, data string
+		rows.Scan(&id, &rtype, &name, &url, &data)
+		reg := map[string]any{"id": id, "type": rtype, "name": name, "url": url}
+		var extra map[string]any
+		if json.Unmarshal([]byte(data), &extra) == nil {
+			for k, v := range extra { reg[k] = v }
+		}
+		result = append(result, reg)
+	}
+	if result == nil { result = []map[string]any{} }
+	return result, nil
+}
+
+func CreateRegistry(reg map[string]any) (string, error) {
+	id := fmt.Sprintf("reg-%d", time.Now().UnixNano())
+	name, _ := reg["name"].(string)
+	url, _ := reg["url"].(string)
+	rtype, _ := reg["type"].(string)
+	data, _ := json.Marshal(reg)
+	_, err := db.Exec("INSERT INTO registries (id, type, name, url, data) VALUES (?, ?, ?, ?, ?)",
+		id, rtype, name, url, string(data))
+	return id, err
+}
+
+func GetRegistry(id string) (map[string]any, error) {
+	var rtype, name, url, data string
+	err := db.QueryRow("SELECT type, name, url, data FROM registries WHERE id = ?", id).Scan(&rtype, &name, &url, &data)
+	if err != nil { return nil, err }
+	reg := map[string]any{"id": id, "type": rtype, "name": name, "url": url}
+	var extra map[string]any
+	if json.Unmarshal([]byte(data), &extra) == nil {
+		for k, v := range extra { reg[k] = v }
+	}
+	return reg, nil
+}
+
+func UpdateRegistry(id string, reg map[string]any) error {
+	name, _ := reg["name"].(string)
+	url, _ := reg["url"].(string)
+	data, _ := json.Marshal(reg)
+	_, err := db.Exec("UPDATE registries SET name=?, url=?, data=? WHERE id=?", name, url, string(data), id)
+	return err
+}
+
+func DeleteRegistry(id string) error {
+	_, err := db.Exec("DELETE FROM registries WHERE id = ?", id)
+	return err
 }

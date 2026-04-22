@@ -949,3 +949,119 @@ func ServiceRollback(w http.ResponseWriter, r *http.Request) {
 	}
 	json200(w, map[string]string{"status": "rolled back"})
 }
+
+// ── #43 Service stop ──
+
+func ServiceStop(w http.ResponseWriter, r *http.Request) {
+	id := resolveServiceID(chi.URLParam(r, "id"))
+	svc, err := docker.Service(id)
+	if err != nil { jsonErr(w, 404, "service not found"); return }
+	zero := uint64(0)
+	svc.Spec.Mode.Replicated.Replicas = &zero
+	if err := docker.UpdateService(id, svc.Version, svc.Spec); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "stopped"})
+}
+
+// ── #44 Stack redeploy/rollback ──
+
+func StackRedeploy(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
+	count := 0
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name {
+			s.Spec.TaskTemplate.ForceUpdate++
+			if err := docker.UpdateService(s.ID, s.Version, s.Spec); err == nil { count++ }
+		}
+	}
+	json200(w, map[string]any{"status": "redeployed", "services": count})
+}
+
+func StackRollback(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
+	count := 0
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name && s.PreviousSpec != nil {
+			if err := docker.UpdateService(s.ID, s.Version, *s.PreviousSpec); err == nil { count++ }
+		}
+	}
+	json200(w, map[string]any{"status": "rolled back", "services": count})
+}
+
+// ── #45 Registry management ──
+
+func RegistryList(w http.ResponseWriter, r *http.Request) {
+	regType := chi.URLParam(r, "type")
+	regs, _ := store.ListRegistries(regType)
+	json200(w, regs)
+}
+
+func RegistryCreate(w http.ResponseWriter, r *http.Request) {
+	regType := chi.URLParam(r, "type")
+	var reg map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&reg); err != nil {
+		jsonErr(w, 400, "invalid body"); return
+	}
+	reg["type"] = regType
+	id, err := store.CreateRegistry(reg)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	reg["id"] = id
+	json200(w, reg)
+}
+
+func RegistryInfo(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	reg, err := store.GetRegistry(id)
+	if err != nil { jsonErr(w, 404, "registry not found"); return }
+	json200(w, reg)
+}
+
+func RegistryUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var reg map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&reg); err != nil {
+		jsonErr(w, 400, "invalid body"); return
+	}
+	if err := store.UpdateRegistry(id, reg); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+func RegistryDelete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := store.DeleteRegistry(id); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+func RegistryRepositories(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	reg, err := store.GetRegistry(id)
+	if err != nil { jsonErr(w, 404, "registry not found"); return }
+	repos, err := listRegistryRepos(reg)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, repos)
+}
+
+// ── #46 Image tags + DockerHub search ──
+
+func PublicRepositories(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("query")
+	if query == "" { json200(w, []any{}); return }
+	repos, err := searchDockerHub(query)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, repos)
+}
+
+func ImageTags(w http.ResponseWriter, r *http.Request) {
+	repo := chi.URLParam(r, "*")
+	if repo == "" { json200(w, []any{}); return }
+	tags, err := fetchDockerHubTags(repo)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, tags)
+}
