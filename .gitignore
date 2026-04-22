@@ -80,3 +80,4 @@ dist/
 !/data/
 web-app/node_modules/
 .playwright-mcp/
+todo.json
