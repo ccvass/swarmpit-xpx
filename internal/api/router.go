@@ -172,6 +172,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		path := r.URL.Path[1:]
 		if path == "" {
 			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cache-Control", "no-store")
 			w.Write(indexHTML)
 			return
 		}
@@ -179,6 +180,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		if err != nil {
 			// SPA fallback
 			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cache-Control", "no-store")
 			w.Write(indexHTML)
 			return
 		}
@@ -186,6 +188,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		stat, _ := f.Stat()
 		if stat.IsDir() {
 			w.Header().Set("Content-Type", "text/html")
+			w.Header().Set("Cache-Control", "no-store")
 			w.Write(indexHTML)
 			return
 		}
