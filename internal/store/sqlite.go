@@ -471,3 +471,91 @@ func DeleteTemplate(id string) error {
 	_, err := db.Exec("DELETE FROM templates WHERE id=?", id)
 	return err
 }
+
+// ── Backup/Restore (#55) ──
+
+func ExportAll() (map[string]any, error) {
+	result := map[string]any{}
+	tables := map[string]string{
+		"users":          "SELECT id, username, role, email FROM users",
+		"registries":     "SELECT id, type, name, url, data FROM registries",
+		"webhooks":       "SELECT id, service_id, token, created_at, last_triggered FROM webhooks",
+		"alert_rules":    "SELECT id, type, condition, threshold, channel, target, enabled FROM alert_rules",
+		"templates":      "SELECT id, name, description, spec, created_at FROM templates",
+		"dashboard_pins": "SELECT username, resource_type, resource_id FROM dashboard_pins",
+	}
+	for name, query := range tables {
+		rows, err := db.Query(query)
+		if err != nil {
+			continue
+		}
+		cols, _ := rows.Columns()
+		var records []map[string]any
+		for rows.Next() {
+			vals := make([]any, len(cols))
+			ptrs := make([]any, len(cols))
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			rows.Scan(ptrs...)
+			row := map[string]any{}
+			for i, c := range cols {
+				row[c] = vals[i]
+			}
+			records = append(records, row)
+		}
+		rows.Close()
+		if records == nil {
+			records = []map[string]any{}
+		}
+		result[name] = records
+	}
+	return result, nil
+}
+
+func ImportAll(data map[string]json.RawMessage) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	type tableConf struct {
+		clear  string
+		insert string
+		cols   []string
+	}
+	tables := map[string]tableConf{
+		"users":          {"DELETE FROM users", "INSERT OR REPLACE INTO users (id, username, role, email) VALUES (?,?,?,?)", []string{"id", "username", "role", "email"}},
+		"registries":     {"DELETE FROM registries", "INSERT OR REPLACE INTO registries (id, type, name, url, data) VALUES (?,?,?,?,?)", []string{"id", "type", "name", "url", "data"}},
+		"webhooks":       {"DELETE FROM webhooks", "INSERT OR REPLACE INTO webhooks (id, service_id, token, created_at, last_triggered) VALUES (?,?,?,?,?)", []string{"id", "service_id", "token", "created_at", "last_triggered"}},
+		"alert_rules":    {"DELETE FROM alert_rules", "INSERT OR REPLACE INTO alert_rules (id, type, condition, threshold, channel, target, enabled) VALUES (?,?,?,?,?,?,?)", []string{"id", "type", "condition", "threshold", "channel", "target", "enabled"}},
+		"templates":      {"DELETE FROM templates", "INSERT OR REPLACE INTO templates (id, name, description, spec, created_at) VALUES (?,?,?,?,?)", []string{"id", "name", "description", "spec", "created_at"}},
+		"dashboard_pins": {"DELETE FROM dashboard_pins", "INSERT OR REPLACE INTO dashboard_pins (username, resource_type, resource_id) VALUES (?,?,?)", []string{"username", "resource_type", "resource_id"}},
+	}
+
+	for name, conf := range tables {
+		raw, ok := data[name]
+		if !ok {
+			continue
+		}
+		var records []map[string]any
+		if err := json.Unmarshal(raw, &records); err != nil {
+			continue
+		}
+		tx.Exec(conf.clear)
+		stmt, err := tx.Prepare(conf.insert)
+		if err != nil {
+			continue
+		}
+		for _, rec := range records {
+			vals := make([]any, len(conf.cols))
+			for i, c := range conf.cols {
+				vals[i] = rec[c]
+			}
+			stmt.Exec(vals...)
+		}
+		stmt.Close()
+	}
+	return tx.Commit()
+}

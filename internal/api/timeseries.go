@@ -256,6 +256,24 @@ func getServiceTimeseries(sortBy string) []map[string]any {
 	return result
 }
 
+func getServiceTimeseriesByName(serviceName string) map[string]any {
+	tsStore.RLock()
+	defer tsStore.RUnlock()
+	points, ok := tsStore.services[serviceName]
+	if !ok || len(points) == 0 {
+		return map[string]any{"service": serviceName, "task": nil, "time": []string{}, "cpu": []float64{}, "memory": []float64{}}
+	}
+	times := make([]string, len(points))
+	cpus := make([]float64, len(points))
+	mems := make([]float64, len(points))
+	for i, p := range points {
+		times[i] = time.Unix(p.Ts, 0).Format(time.RFC3339)
+		cpus[i] = p.CPU
+		mems[i] = p.Memory / (1024 * 1024)
+	}
+	return map[string]any{"service": serviceName, "task": nil, "time": times, "cpu": cpus, "memory": mems}
+}
+
 func getTaskTimeseries(taskName string) []map[string]any {
 	tsStore.RLock()
 	defer tsStore.RUnlock()

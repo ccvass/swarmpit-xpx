@@ -69,6 +69,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Get("/api/services/{id}/tasks", ServiceTaskList)
 		r.Get("/api/services/{id}/networks", ServiceNetworks)
 		r.Get("/api/services/{id}/compose", ServiceCompose)
+		r.Get("/api/services/{id}/ts", ServiceTimeseries)
 		r.Delete("/api/services/{id}", ServiceDelete)
 		r.Post("/api/services", ServiceCreate)
 		r.Post("/api/services/{id}/update", ServiceUpdate)
@@ -161,6 +162,8 @@ func NewRouter(staticFS fs.FS) http.Handler {
 			r.Post("/api/users", UserCreate)
 			r.Put("/api/users/{id}", UserUpdate)
 			r.Delete("/api/users/{id}", UserDelete)
+			r.Get("/api/backup", BackupHandler)
+			r.Post("/api/restore", RestoreHandler)
 		})
 	})
 

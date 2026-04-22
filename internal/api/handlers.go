@@ -1430,6 +1430,47 @@ func sendWebhookAlert(url, msg string) {
 	resp.Body.Close()
 }
 
+// ── #60 Per-service timeseries ──
+
+func ServiceTimeseries(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	// Resolve service ID/prefix to name
+	svcs, _ := docker.Services()
+	svcName := id
+	for _, s := range svcs {
+		if s.ID == id || strings.HasPrefix(s.ID, id) || s.Spec.Name == id {
+			svcName = s.Spec.Name
+			break
+		}
+	}
+	json200(w, getServiceTimeseriesByName(svcName))
+}
+
+// ── #55 Backup/restore ──
+
+func BackupHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := store.ExportAll()
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	w.Header().Set("Content-Disposition", "attachment; filename=swarmpit-backup.json")
+	json200(w, data)
+}
+
+func RestoreHandler(w http.ResponseWriter, r *http.Request) {
+	var data map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		jsonErr(w, 400, "invalid JSON: "+err.Error())
+		return
+	}
+	if err := store.ImportAll(data); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "restored"})
+}
+
 // ── #56 Service templates ──
 
 func TemplateList(w http.ResponseWriter, r *http.Request) { json200(w, store.ListTemplates()) }
