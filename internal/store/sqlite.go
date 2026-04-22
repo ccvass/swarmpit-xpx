@@ -45,6 +45,10 @@ func Init(dbPath string) error {
 		CREATE TABLE IF NOT EXISTS registries (
 			id TEXT PRIMARY KEY, type TEXT NOT NULL, name TEXT, url TEXT, data TEXT
 		);
+		CREATE TABLE IF NOT EXISTS dashboard_pins (
+			username TEXT, resource_type TEXT, resource_id TEXT,
+			PRIMARY KEY(username, resource_type, resource_id)
+		);
 	`)
 	if err != nil {
 		return err
@@ -118,6 +122,49 @@ func Users() []User {
 		users = append(users, u)
 	}
 	return users
+}
+
+func ListUsers() []User { return Users() }
+
+func UpdateUser(id, username, email, role string) error {
+	_, err := db.Exec("UPDATE users SET username=?, email=?, role=? WHERE id=?", username, email, role, id)
+	return err
+}
+
+func DeleteUser(id string) error {
+	_, err := db.Exec("DELETE FROM users WHERE id=?", id)
+	return err
+}
+
+// Dashboard pins
+
+func TogglePin(username, resourceType, resourceID string) bool {
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM dashboard_pins WHERE username=? AND resource_type=? AND resource_id=?",
+		username, resourceType, resourceID).Scan(&count)
+	if count > 0 {
+		db.Exec("DELETE FROM dashboard_pins WHERE username=? AND resource_type=? AND resource_id=?",
+			username, resourceType, resourceID)
+		return false
+	}
+	db.Exec("INSERT INTO dashboard_pins (username, resource_type, resource_id) VALUES (?,?,?)",
+		username, resourceType, resourceID)
+	return true
+}
+
+func GetPins(username, resourceType string) []string {
+	rows, err := db.Query("SELECT resource_id FROM dashboard_pins WHERE username=? AND resource_type=?",
+		username, resourceType)
+	if err != nil { return []string{} }
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	if ids == nil { ids = []string{} }
+	return ids
 }
 
 // Audit

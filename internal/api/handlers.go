@@ -1139,7 +1139,12 @@ func Me(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 404, "user not found")
 		return
 	}
-	json200(w, user)
+	resp := map[string]any{
+		"_id": user.ID, "username": user.Username, "role": user.Role, "email": user.Email,
+		"serviceDashboard": store.GetPins(username, "service"),
+		"nodeDashboard":    store.GetPins(username, "node"),
+	}
+	json200(w, resp)
 }
 
 func PasswordChange(w http.ResponseWriter, r *http.Request) {
@@ -1181,4 +1186,61 @@ func WebhookDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json200(w, map[string]string{"status": "deleted"})
+}
+
+// ── #39 User management (admin-only) ──
+
+func UserList(w http.ResponseWriter, r *http.Request) {
+	json200(w, store.ListUsers())
+}
+
+func UserCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Username == "" || body.Password == "" {
+		jsonErr(w, 400, "username and password required"); return
+	}
+	if body.Role == "" { body.Role = "user" }
+	user, err := store.CreateUser(body.Username, body.Password, body.Role, body.Email)
+	if err != nil { jsonErr(w, 500, err.Error()); return }
+	json200(w, user)
+}
+
+func UserUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var body struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, 400, "invalid body"); return
+	}
+	if err := store.UpdateUser(id, body.Username, body.Email, body.Role); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+func UserDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteUser(chi.URLParam(r, "id")); err != nil {
+		jsonErr(w, 500, err.Error()); return
+	}
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+// ── #51 Dashboard pinning ──
+
+func DashboardPinService(w http.ResponseWriter, r *http.Request) {
+	pinned := store.TogglePin(r.Header.Get("X-User"), "service", chi.URLParam(r, "id"))
+	json200(w, map[string]bool{"pinned": pinned})
+}
+
+func DashboardPinNode(w http.ResponseWriter, r *http.Request) {
+	pinned := store.TogglePin(r.Header.Get("X-User"), "node", chi.URLParam(r, "id"))
+	json200(w, map[string]bool{"pinned": pinned})
 }

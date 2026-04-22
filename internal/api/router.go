@@ -127,9 +127,16 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Get("/api/tags/*", ImageTags)
 		r.Get("/exec/{id}", ExecHandler)
 
+		r.Post("/api/services/{id}/dashboard", DashboardPinService)
+		r.Post("/api/nodes/{id}/dashboard", DashboardPinNode)
+
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)
 			r.Get("/api/audit", AuditList)
+			r.Get("/api/users", UserList)
+			r.Post("/api/users", UserCreate)
+			r.Put("/api/users/{id}", UserUpdate)
+			r.Delete("/api/users/{id}", UserDelete)
 		})
 	})
 
