@@ -1065,3 +1065,120 @@ func ImageTags(w http.ResponseWriter, r *http.Request) {
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	json200(w, tags)
 }
+
+// ── #47 Node edit — labels and availability ──
+
+func NodeEdit(w http.ResponseWriter, r *http.Request) {
+	id := resolveNodeID(chi.URLParam(r, "id"))
+	node, err := docker.Node(id)
+	if err != nil {
+		jsonErr(w, 404, "node not found")
+		return
+	}
+	var body struct {
+		Role         string            `json:"role"`
+		Availability string            `json:"availability"`
+		Labels       []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"labels"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, 400, "invalid body")
+		return
+	}
+	if body.Role != "" {
+		node.Spec.Role = swarm.NodeRole(body.Role)
+	}
+	if body.Availability != "" {
+		node.Spec.Availability = swarm.NodeAvailability(body.Availability)
+	}
+	if body.Labels != nil {
+		labels := map[string]string{}
+		for _, l := range body.Labels {
+			labels[l.Name] = l.Value
+		}
+		node.Spec.Labels = labels
+	}
+	if err := docker.NodeUpdate(id, node.Version, node.Spec); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "updated"})
+}
+
+// ── #48 Stack activate/deactivate ──
+
+func StackActivate(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(501)
+	json200(w, map[string]string{"error": "not implemented — requires remembering previous replica counts"})
+}
+
+func StackDeactivate(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
+	count := 0
+	zero := uint64(0)
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name && s.Spec.Mode.Replicated != nil {
+			s.Spec.Mode.Replicated.Replicas = &zero
+			if err := docker.UpdateService(s.ID, s.Version, s.Spec); err == nil {
+				count++
+			}
+		}
+	}
+	json200(w, map[string]any{"status": "deactivated", "services": count})
+}
+
+// ── #49 Password change + user profile ──
+
+func Me(w http.ResponseWriter, r *http.Request) {
+	username := r.Header.Get("X-User")
+	user := store.GetUserByUsername(username)
+	if user == nil {
+		jsonErr(w, 404, "user not found")
+		return
+	}
+	json200(w, user)
+}
+
+func PasswordChange(w http.ResponseWriter, r *http.Request) {
+	username := r.Header.Get("X-User")
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Password == "" {
+		jsonErr(w, 400, "password required")
+		return
+	}
+	if err := store.UpdatePassword(username, body.Password); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "ok"})
+}
+
+// ── #50 Webhooks CRUD ──
+
+func WebhookList(w http.ResponseWriter, r *http.Request) {
+	json200(w, store.ListWebhooks())
+}
+
+func WebhookCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ServiceName string `json:"serviceName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ServiceName == "" {
+		jsonErr(w, 400, "serviceName required")
+		return
+	}
+	json200(w, store.CreateWebhook(body.ServiceName))
+}
+
+func WebhookDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteWebhook(chi.URLParam(r, "id")); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "deleted"})
+}

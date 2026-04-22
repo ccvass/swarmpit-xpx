@@ -274,3 +274,55 @@ func DeleteRegistry(id string) error {
 	_, err := db.Exec("DELETE FROM registries WHERE id = ?", id)
 	return err
 }
+
+// ── User profile & password ──
+
+func GetUserByUsername(username string) *User {
+	var u User
+	err := db.QueryRow("SELECT id, username, role, email FROM users WHERE username = ?", username).
+		Scan(&u.ID, &u.Username, &u.Role, &u.Email)
+	if err != nil {
+		return nil
+	}
+	return &u
+}
+
+func UpdatePassword(username, newPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), 12)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("UPDATE users SET password = ? WHERE username = ?", string(hash), username)
+	return err
+}
+
+// ── Webhooks CRUD ──
+
+func ListWebhooks() []map[string]any {
+	rows, err := db.Query("SELECT id, service_id, token, created_at, last_triggered FROM webhooks ORDER BY created_at DESC")
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, svcID, token string
+		var createdAt int64
+		var lastTriggered sql.NullInt64
+		rows.Scan(&id, &svcID, &token, &createdAt, &lastTriggered)
+		entry := map[string]any{"id": id, "serviceName": svcID, "token": token, "createdAt": createdAt}
+		if lastTriggered.Valid {
+			entry["lastTriggered"] = lastTriggered.Int64
+		}
+		result = append(result, entry)
+	}
+	if result == nil {
+		result = []map[string]any{}
+	}
+	return result
+}
+
+func DeleteWebhook(id string) error {
+	_, err := db.Exec("DELETE FROM webhooks WHERE id = ?", id)
+	return err
+}

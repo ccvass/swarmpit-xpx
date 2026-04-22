@@ -277,3 +277,9 @@ func UpdateConfig(id string, version swarm.Version, spec swarm.ConfigSpec) error
 	defer cancel()
 	return cli.ConfigUpdate(ctx, id, version, spec)
 }
+
+func NodeUpdate(id string, version swarm.Version, spec swarm.NodeSpec) error {
+	ctx, cancel := withTimeout()
+	defer cancel()
+	return cli.NodeUpdate(ctx, id, version, spec)
+}
