@@ -169,6 +169,26 @@
 
   /* ── Main loop ── */
   window.addEventListener('hashchange', function () { setTimeout(function () { injectSidebar(); renderPage(); }, 300); });
-  setInterval(function () { getToken(); if (TOKEN) injectSidebar(); }, 2000);
-  setTimeout(function () { getToken(); if (TOKEN) { injectSidebar(); renderPage(); } }, 1500);
+
+  // Use MutationObserver to re-inject when ClojureScript re-renders nav
+  function startObserver() {
+    var nav = document.querySelector('nav');
+    if (!nav) return false;
+    var observer = new MutationObserver(function () {
+      if (!document.getElementById('xpx-sidebar')) injectSidebar();
+    });
+    observer.observe(nav, { childList: true, subtree: true });
+    return true;
+  }
+
+  // Init: wait for nav to appear, then inject + observe
+  var initInterval = setInterval(function () {
+    getToken();
+    if (!TOKEN) return;
+    var nav = document.querySelector('nav');
+    if (!nav || !nav.querySelector('hr')) return;
+    injectSidebar();
+    renderPage();
+    if (startObserver()) clearInterval(initInterval);
+  }, 500);
 })();
