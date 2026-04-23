@@ -29,6 +29,8 @@ func main() {
 
 	api.InitTimeseries()
 	api.StartAlertChecker()
+	api.StartImageUpdateChecker()
+	api.StartBackupScheduler()
 
 	publicDir := envOr("SWARMPIT_PUBLIC_DIR", "resources/public")
 	port := envOr("PORT", "8080")

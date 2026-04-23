@@ -72,6 +72,8 @@ func Init(dbPath string) error {
 	return nil
 }
 
+func DBDir() string { return dbDir }
+
 func GetSecret() string {
 	var s string
 	db.QueryRow("SELECT secret FROM secret LIMIT 1").Scan(&s)

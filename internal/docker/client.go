@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/system"
@@ -282,4 +283,14 @@ func NodeUpdate(id string, version swarm.Version, spec swarm.NodeSpec) error {
 	ctx, cancel := withTimeout()
 	defer cancel()
 	return cli.NodeUpdate(ctx, id, version, spec)
+}
+
+func Client() *client.Client { return cli }
+
+func ImageListOpts(dangling bool) image.ListOptions {
+	f := filters.NewArgs()
+	if dangling {
+		f.Add("dangling", "true")
+	}
+	return image.ListOptions{Filters: f}
 }

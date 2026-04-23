@@ -164,6 +164,12 @@ func NewRouter(staticFS fs.FS) http.Handler {
 			r.Delete("/api/users/{id}", UserDelete)
 			r.Get("/api/backup", BackupHandler)
 			r.Post("/api/restore", RestoreHandler)
+			r.Post("/api/services/check-updates", CheckImageUpdates)
+			r.Get("/api/services/update-status", GetImageUpdateStatus)
+			r.Post("/api/system/prune", PruneSystem)
+			r.Post("/api/backup/s3", BackupToS3)
+			r.Get("/api/backup/s3", ListS3Backups)
+			r.Post("/api/restore/s3", RestoreFromS3)
 		})
 	})
 
