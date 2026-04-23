@@ -24,7 +24,7 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o swarmpit ./cmd/swarmpit
 # Stage 3: Runtime
 FROM alpine:3.21
 LABEL org.opencontainers.image.source="https://github.com/ccvass/swarmpit-xpx"
-RUN apk add --no-cache docker-cli curl ca-certificates && mkdir -p /app/data
+RUN apk add --no-cache docker-cli curl ca-certificates git && mkdir -p /app/data
 WORKDIR /app
 COPY --from=builder /app/swarmpit .
 COPY --from=frontend /app/resources/public/ /app/public/
