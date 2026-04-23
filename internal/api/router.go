@@ -46,6 +46,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Post("/login", Login)
 	r.Post("/initialize", Initialize)
 	r.Post("/api/webhooks/{token}", WebhookTrigger)
+	r.Post("/api/webhooks/git/{id}", GitWebhookHandler)
 	r.Get("/events", SSEHandler)
 	r.Post("/events", EventPush)
 	r.Get("/slt", func(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +155,13 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Delete("/api/templates/{id}", TemplateDelete)
 
 		r.Post("/api/compose/validate", ComposeValidate)
+
+		r.Get("/api/gitops", GitStackList)
+		r.Post("/api/gitops", GitStackCreate)
+		r.Get("/api/gitops/{id}", GitStackGet)
+		r.Put("/api/gitops/{id}", GitStackUpdate)
+		r.Delete("/api/gitops/{id}", GitStackDelete)
+		r.Post("/api/gitops/{id}/sync", GitStackSync)
 
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)

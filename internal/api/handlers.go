@@ -614,19 +614,7 @@ func AuditList(w http.ResponseWriter, r *http.Request) {
 }
 
 func GitDeploy(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		RepoURL     string `json:"repo-url"`
-		Branch      string `json:"branch"`
-		ComposePath string `json:"compose-path"`
-		StackName   string `json:"stack-name"`
-	}
-	json.NewDecoder(r.Body).Decode(&body)
-	if body.RepoURL == "" || body.StackName == "" {
-		jsonErr(w, 400, "repo-url and stack-name required")
-		return
-	}
-	// TODO: implement git clone + stack deploy
-	json200(w, map[string]string{"status": "not implemented yet"})
+	GitStackCreate(w, r)
 }
 
 // Node tasks

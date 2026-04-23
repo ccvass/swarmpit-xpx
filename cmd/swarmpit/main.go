@@ -31,6 +31,7 @@ func main() {
 	api.StartAlertChecker()
 	api.StartImageUpdateChecker()
 	api.StartBackupScheduler()
+	api.StartGitOpsScheduler()
 
 	publicDir := envOr("SWARMPIT_PUBLIC_DIR", "resources/public")
 	port := envOr("PORT", "8080")

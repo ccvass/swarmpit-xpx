@@ -59,6 +59,14 @@ func Init(dbPath string) error {
 		CREATE TABLE IF NOT EXISTS templates (
 			id TEXT PRIMARY KEY, name TEXT, description TEXT, spec TEXT, created_at TEXT
 		);
+		CREATE TABLE IF NOT EXISTS git_stacks (
+			id TEXT PRIMARY KEY, stack_name TEXT UNIQUE NOT NULL,
+			repo_url TEXT NOT NULL, branch TEXT DEFAULT 'main',
+			compose_path TEXT DEFAULT 'docker-compose.yml',
+			credentials TEXT, sync_interval INTEGER DEFAULT 0,
+			last_hash TEXT, last_sync TEXT, last_error TEXT,
+			enabled INTEGER DEFAULT 1
+		);
 	`)
 	if err != nil {
 		return err
@@ -560,4 +568,89 @@ func ImportAll(data map[string]json.RawMessage) error {
 		stmt.Close()
 	}
 	return tx.Commit()
+}
+
+// ─── Git Stacks ───
+
+type GitStack struct {
+	ID           string `json:"id"`
+	StackName    string `json:"stackName"`
+	RepoURL      string `json:"repoUrl"`
+	Branch       string `json:"branch"`
+	ComposePath  string `json:"composePath"`
+	Credentials  string `json:"credentials,omitempty"`
+	SyncInterval int    `json:"syncInterval"` // seconds, 0 = disabled
+	LastHash     string `json:"lastHash"`
+	LastSync     string `json:"lastSync"`
+	LastError    string `json:"lastError"`
+	Enabled      bool   `json:"enabled"`
+}
+
+func CreateGitStack(gs GitStack) (GitStack, error) {
+	gs.ID = uuid.NewString()
+	if gs.Branch == "" { gs.Branch = "main" }
+	if gs.ComposePath == "" { gs.ComposePath = "docker-compose.yml" }
+	_, err := db.Exec(`INSERT INTO git_stacks (id, stack_name, repo_url, branch, compose_path, credentials, sync_interval, enabled)
+		VALUES (?,?,?,?,?,?,?,?)`, gs.ID, gs.StackName, gs.RepoURL, gs.Branch, gs.ComposePath, gs.Credentials, gs.SyncInterval, boolToInt(gs.Enabled))
+	return gs, err
+}
+
+func ListGitStacks() []GitStack {
+	rows, err := db.Query("SELECT id, stack_name, repo_url, branch, compose_path, credentials, sync_interval, last_hash, last_sync, last_error, enabled FROM git_stacks")
+	if err != nil { return nil }
+	defer rows.Close()
+	var result []GitStack
+	for rows.Next() {
+		var gs GitStack
+		var en int
+		var cred, lh, ls, le sql.NullString
+		rows.Scan(&gs.ID, &gs.StackName, &gs.RepoURL, &gs.Branch, &gs.ComposePath, &cred, &gs.SyncInterval, &lh, &ls, &le, &en)
+		gs.Credentials = cred.String; gs.LastHash = lh.String; gs.LastSync = ls.String; gs.LastError = le.String
+		gs.Enabled = en == 1
+		result = append(result, gs)
+	}
+	if result == nil { result = []GitStack{} }
+	return result
+}
+
+func GetGitStack(id string) (GitStack, error) {
+	var gs GitStack
+	var en int
+	var cred, lh, ls, le sql.NullString
+	err := db.QueryRow("SELECT id, stack_name, repo_url, branch, compose_path, credentials, sync_interval, last_hash, last_sync, last_error, enabled FROM git_stacks WHERE id=?", id).
+		Scan(&gs.ID, &gs.StackName, &gs.RepoURL, &gs.Branch, &gs.ComposePath, &cred, &gs.SyncInterval, &lh, &ls, &le, &en)
+	gs.Credentials = cred.String; gs.LastHash = lh.String; gs.LastSync = ls.String; gs.LastError = le.String
+	gs.Enabled = en == 1
+	return gs, err
+}
+
+func GetGitStackByName(name string) (GitStack, error) {
+	var gs GitStack
+	var en int
+	var cred, lh, ls, le sql.NullString
+	err := db.QueryRow("SELECT id, stack_name, repo_url, branch, compose_path, credentials, sync_interval, last_hash, last_sync, last_error, enabled FROM git_stacks WHERE stack_name=?", name).
+		Scan(&gs.ID, &gs.StackName, &gs.RepoURL, &gs.Branch, &gs.ComposePath, &cred, &gs.SyncInterval, &lh, &ls, &le, &en)
+	gs.Credentials = cred.String; gs.LastHash = lh.String; gs.LastSync = ls.String; gs.LastError = le.String
+	gs.Enabled = en == 1
+	return gs, err
+}
+
+func UpdateGitStack(id string, gs GitStack) error {
+	_, err := db.Exec(`UPDATE git_stacks SET repo_url=?, branch=?, compose_path=?, credentials=?, sync_interval=?, enabled=? WHERE id=?`,
+		gs.RepoURL, gs.Branch, gs.ComposePath, gs.Credentials, gs.SyncInterval, boolToInt(gs.Enabled), id)
+	return err
+}
+
+func UpdateGitStackSync(id, hash, syncTime, lastErr string) {
+	db.Exec("UPDATE git_stacks SET last_hash=?, last_sync=?, last_error=? WHERE id=?", hash, syncTime, lastErr, id)
+}
+
+func DeleteGitStack(id string) error {
+	_, err := db.Exec("DELETE FROM git_stacks WHERE id=?", id)
+	return err
+}
+
+func boolToInt(b bool) int {
+	if b { return 1 }
+	return 0
 }
