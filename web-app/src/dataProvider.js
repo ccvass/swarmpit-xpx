@@ -13,6 +13,7 @@ const resourceMap = {
   configs: { endpoint: '/api/configs', getId: r => r.ID, getName: r => r.Spec?.Name },
   stacks: { endpoint: '/api/stacks', getId: r => r.stackName, getName: r => r.stackName },
   audit: { endpoint: '/api/audit', getId: r => r.id },
+  gitops: { endpoint: '/api/gitops', getId: r => r.id },
 };
 
 export default {
@@ -60,11 +61,20 @@ export default {
     return { data: { id: params.id } };
   },
 
-  // Stubs for required interface
-  getMany: async () => ({ data: [] }),
-  getManyReference: async () => ({ data: [], total: 0 }),
-  create: async () => ({ data: { id: '' } }),
-  update: async () => ({ data: { id: '' } }),
+  create: async (resource, params) => {
+    const map = resourceMap[resource];
+    if (!map) return { data: { id: '' } };
+    const res = await fetch(map.endpoint, { method: 'POST', headers: headers(), body: JSON.stringify(params.data) });
+    const data = await res.json();
+    return { data: { ...data, id: map.getId(data) } };
+  },
+  update: async (resource, params) => {
+    const map = resourceMap[resource];
+    if (!map) return { data: { id: '' } };
+    const res = await fetch(`${map.endpoint}/${params.id}`, { method: 'PUT', headers: headers(), body: JSON.stringify(params.data) });
+    const data = await res.json();
+    return { data: { ...params.data, id: params.id } };
+  },
   updateMany: async () => ({ data: [] }),
   deleteMany: async (resource, params) => {
     for (const id of params.ids) {

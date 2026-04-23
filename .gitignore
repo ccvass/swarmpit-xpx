@@ -37,6 +37,7 @@ reference/
 /target/
 /out/
 /resources/public/js/**
+!/resources/public/js/xpx-features.js
 pom.xml
 pom.xml.asc
 
