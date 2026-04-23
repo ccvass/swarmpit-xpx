@@ -9,5 +9,5 @@ export default {
   checkAuth: () => localStorage.getItem('token') ? Promise.resolve() : Promise.reject(),
   checkError: (error) => error.status === 401 ? Promise.reject() : Promise.resolve(),
   getIdentity: () => Promise.resolve({ id: 'admin', fullName: 'Admin' }),
-  getPermissions: () => Promise.resolve('admin'),
+  getPermissions: () => Promise.resolve(['admin']),
 };
