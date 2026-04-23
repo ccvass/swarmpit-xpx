@@ -30,7 +30,6 @@ COPY --from=builder /app/swarmpit .
 COPY --from=frontend /app/resources/public/ /app/public/
 COPY resources/index.html /app/public/
 COPY resources/public/js/xpx-features.js /app/public/js/xpx-features.js
-COPY web/ /app/web/
 
 # Rebrand: replace ALL purple/lilac with blue in compiled JS and CSS
 RUN sed -i \
@@ -127,7 +126,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -fs http://localhost:8080/health/live || exit 1
 
 ENV SWARMPIT_PUBLIC_DIR=/app/public
-ENV SWARMPIT_WEBAPP_DIR=/app/web
 ENV SWARMPIT_DB_PATH=/app/data
 EXPOSE 8080
 CMD ["./swarmpit"]

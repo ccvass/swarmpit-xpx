@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
@@ -181,42 +180,6 @@ func NewRouter(staticFS fs.FS) http.Handler {
 			r.Post("/api/restore/s3", RestoreFromS3)
 		})
 	})
-
-	// React Admin panel at /admin
-	webAppDir := os.Getenv("SWARMPIT_WEBAPP_DIR")
-	if webAppDir == "" { webAppDir = "web" }
-	if _, err := os.Stat(webAppDir); err == nil {
-		webFS := os.DirFS(webAppDir)
-		webIndex, _ := fs.ReadFile(webFS, "index.html")
-		r.Get("/admin", func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Set("Content-Type", "text/html")
-			w.Write(webIndex)
-		})
-		r.Get("/admin/*", func(w http.ResponseWriter, req *http.Request) {
-			path := strings.TrimPrefix(req.URL.Path, "/admin/")
-			if path == "" { path = "index.html" }
-			f, err := webFS.Open(path)
-			if err != nil {
-				w.Header().Set("Content-Type", "text/html")
-				w.Write(webIndex)
-				return
-			}
-			defer f.Close()
-			stat, _ := f.Stat()
-			if stat.IsDir() {
-				w.Header().Set("Content-Type", "text/html")
-				w.Write(webIndex)
-				return
-			}
-			rs, ok := f.(io.ReadSeeker)
-			if ok {
-				http.ServeContent(w, req, path, stat.ModTime(), rs)
-			} else {
-				data, _ := io.ReadAll(f)
-				w.Write(data)
-			}
-		})
-	}
 
 	// Static files + SPA fallback
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
