@@ -21,22 +21,6 @@
   [_ event]
   (state/update-value [:items] event state/form-value-cursor))
 
-(defmethod handle :network-list
-  [_ event]
-  (state/update-value [:items] event state/form-value-cursor))
-
-(defmethod handle :volume-list
-  [_ event]
-  (state/update-value [:items] event state/form-value-cursor))
-
-(defmethod handle :secret-list
-  [_ event]
-  (state/update-value [:items] event state/form-value-cursor))
-
-(defmethod handle :config-list
-  [_ event]
-  (state/update-value [:items] event state/form-value-cursor))
-
 (defmethod handle :default
   [_ event]
   (state/set-value event state/form-value-cursor))
