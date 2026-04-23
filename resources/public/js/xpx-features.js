@@ -1,4 +1,4 @@
-/* swarmpit-xpx features — sidebar items for GitOps, Prune, Image Updates */
+/* swarmpit-xpx features — floating tools panel */
 (function () {
   'use strict';
   var TOKEN = '';
@@ -15,85 +15,79 @@
     return fetch(path, opts).then(function (r) { return r.json(); });
   }
 
-  /* ── Sidebar injection ── */
-  function injectSidebar() {
-    var nav = document.querySelector('nav');
-    if (!nav || document.getElementById('xpx-sidebar')) return;
-    var sep = nav.querySelector('hr');
-    if (!sep) return;
-    var container = sep.parentNode;
+  /* ── Floating button + panel ── */
+  function createToolsButton() {
+    if (document.getElementById('xpx-tools-btn')) return;
 
-    var wrapper = document.createElement('div');
-    wrapper.id = 'xpx-sidebar';
+    // Floating button
+    var btn = document.createElement('div');
+    btn.id = 'xpx-tools-btn';
+    btn.textContent = 'Tools';
+    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:#1976d2;color:#fff;padding:10px 20px;border-radius:24px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.3);user-select:none;';
+    btn.onclick = togglePanel;
+    document.body.appendChild(btn);
+  }
 
-    var label = document.createElement('li');
-    label.style.cssText = 'list-style:none;padding:8px 16px 4px;color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px;';
-    label.textContent = 'Tools';
-    wrapper.appendChild(label);
+  function togglePanel() {
+    var panel = document.getElementById('xpx-tools-panel');
+    if (panel) { panel.remove(); return; }
 
-    var items = [
-      { name: 'GitOps', hash: '#/xpx/gitops' },
-      { name: 'Image Updates', hash: '#/xpx/updates' },
-      { name: 'System Prune', hash: '#/xpx/prune' },
-    ];
+    panel = document.createElement('div');
+    panel.id = 'xpx-tools-panel';
+    panel.style.cssText = 'position:fixed;bottom:70px;right:20px;z-index:9998;background:#fff;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.25);width:600px;max-height:70vh;overflow:auto;padding:20px;font-family:Roboto,sans-serif;';
 
-    items.forEach(function (item) {
-      var a = document.createElement('a');
-      a.href = item.hash;
-      a.textContent = item.name;
-      a.style.cssText = 'display:block;padding:8px 16px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;cursor:pointer;';
-      a.onmouseenter = function () { a.style.color = '#fff'; a.style.background = 'rgba(255,255,255,0.08)'; };
-      a.onmouseleave = function () { a.style.color = 'rgba(255,255,255,0.7)'; a.style.background = 'none'; };
-      a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash.slice(1); renderPage(); };
-      wrapper.appendChild(a);
+    // Tabs
+    var tabs = document.createElement('div');
+    tabs.style.cssText = 'display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #eee;padding-bottom:8px;';
+    var pages = ['GitOps', 'Image Updates', 'System Prune'];
+    pages.forEach(function (name) {
+      var tab = document.createElement('button');
+      tab.textContent = name;
+      tab.dataset.tab = name;
+      tab.style.cssText = 'padding:6px 16px;border:none;background:none;cursor:pointer;font-size:14px;color:#666;border-bottom:2px solid transparent;margin-bottom:-10px;';
+      tab.onclick = function () {
+        tabs.querySelectorAll('button').forEach(function (b) { b.style.color = '#666'; b.style.borderBottomColor = 'transparent'; });
+        tab.style.color = '#1976d2';
+        tab.style.borderBottomColor = '#1976d2';
+        renderTab(name, content);
+      };
+      tabs.appendChild(tab);
     });
+    panel.appendChild(tabs);
 
-    container.insertBefore(wrapper, sep);
+    var content = document.createElement('div');
+    content.id = 'xpx-tab-content';
+    panel.appendChild(content);
+
+    document.body.appendChild(panel);
+
+    // Activate first tab
+    tabs.querySelector('button').click();
   }
 
-  /* ── Page rendering ── */
-  function renderPage() {
-    var hash = window.location.hash;
-    if (hash.indexOf('/xpx/') === -1) { removePage(); return; }
-    var main = document.querySelector('main');
-    if (!main) return;
-
-    var page = document.getElementById('xpx-page');
-    if (!page) {
-      page = document.createElement('div');
-      page.id = 'xpx-page';
-      page.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:#fafafa;z-index:100;padding:24px;overflow:auto;';
-      main.style.position = 'relative';
-      main.appendChild(page);
-    }
-
-    page.innerHTML = '';
-    if (hash.indexOf('gitops') > -1) renderGitOps(page);
-    else if (hash.indexOf('updates') > -1) renderUpdates(page);
-    else if (hash.indexOf('prune') > -1) renderPrune(page);
+  function renderTab(name, container) {
+    container.innerHTML = '';
+    if (name === 'GitOps') renderGitOps(container);
+    else if (name === 'Image Updates') renderUpdates(container);
+    else if (name === 'System Prune') renderPrune(container);
   }
 
-  function removePage() {
-    var page = document.getElementById('xpx-page');
-    if (page) page.remove();
-  }
-
-  /* ── GitOps page ── */
-  function renderGitOps(page) {
-    page.innerHTML = '<h2 style="margin:0 0 16px;font-weight:600">GitOps Stacks</h2><div id="xpx-gitops-list">Loading...</div><button id="xpx-gitops-create" style="margin-top:16px;padding:8px 20px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px">Create GitOps Stack</button>';
+  /* ── GitOps ── */
+  function renderGitOps(el) {
+    el.innerHTML = '<div id="xpx-gitops-list" style="color:#666">Loading...</div><button id="xpx-gitops-create" style="margin-top:12px;padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Create GitOps Stack</button>';
     loadGitOps();
-    document.getElementById('xpx-gitops-create').onclick = function () { showGitOpsForm(page); };
+    document.getElementById('xpx-gitops-create').onclick = function () { showGitOpsForm(el); };
   }
 
   function loadGitOps() {
     api('GET', '/api/gitops').then(function (data) {
       var el = document.getElementById('xpx-gitops-list');
       if (!el) return;
-      if (!data || data.length === 0) { el.innerHTML = '<p style="color:#666">No GitOps stacks configured.</p>'; return; }
-      var html = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="text-align:left;border-bottom:2px solid #ddd"><th style="padding:8px">Stack</th><th style="padding:8px">Repository</th><th style="padding:8px">Branch</th><th style="padding:8px">Status</th><th style="padding:8px">Last Sync</th><th style="padding:8px">Actions</th></tr></thead><tbody>';
+      if (!data || data.length === 0) { el.innerHTML = '<p style="color:#999;margin:0">No GitOps stacks configured.</p>'; return; }
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee"><th style="padding:6px">Stack</th><th style="padding:6px">Repo</th><th style="padding:6px">Branch</th><th style="padding:6px">Status</th><th style="padding:6px">Actions</th></tr></thead><tbody>';
       data.forEach(function (gs) {
         var status = gs.lastError ? '<span style="color:#f44336">Error</span>' : gs.lastHash ? '<span style="color:#4caf50">OK</span>' : '<span style="color:#999">Pending</span>';
-        html += '<tr style="border-bottom:1px solid #eee"><td style="padding:8px">' + gs.stackName + '</td><td style="padding:8px;max-width:300px;overflow:hidden;text-overflow:ellipsis">' + gs.repoUrl + '</td><td style="padding:8px">' + gs.branch + '</td><td style="padding:8px">' + status + '</td><td style="padding:8px">' + (gs.lastSync || '-') + '</td><td style="padding:8px"><button data-sync="' + gs.id + '" style="padding:4px 12px;background:#1976d2;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-right:4px">Sync</button><button data-delete="' + gs.id + '" style="padding:4px 12px;background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer">Delete</button></td></tr>';
+        html += '<tr style="border-bottom:1px solid #f5f5f5"><td style="padding:6px">' + gs.stackName + '</td><td style="padding:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + gs.repoUrl + '</td><td style="padding:6px">' + gs.branch + '</td><td style="padding:6px">' + status + '</td><td style="padding:6px"><button data-sync="' + gs.id + '" style="padding:3px 10px;background:#1976d2;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-right:4px;font-size:12px">Sync</button><button data-delete="' + gs.id + '" style="padding:3px 10px;background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px">Del</button></td></tr>';
       });
       html += '</tbody></table>';
       el.innerHTML = html;
@@ -106,18 +100,19 @@
     });
   }
 
-  function showGitOpsForm(page) {
+  function showGitOpsForm(parent) {
+    if (document.getElementById('xpx-gitops-form')) return;
     var form = document.createElement('div');
-    form.style.cssText = 'margin-top:16px;padding:16px;background:#fff;border:1px solid #ddd;border-radius:4px;max-width:500px;';
-    form.innerHTML = '<h3 style="margin:0 0 12px">New GitOps Stack</h3>' +
-      '<label style="display:block;margin-bottom:8px">Stack Name<br><input id="xf-name" style="width:100%;padding:6px;box-sizing:border-box"></label>' +
-      '<label style="display:block;margin-bottom:8px">Repository URL<br><input id="xf-repo" style="width:100%;padding:6px;box-sizing:border-box"></label>' +
-      '<label style="display:block;margin-bottom:8px">Branch<br><input id="xf-branch" value="main" style="width:100%;padding:6px;box-sizing:border-box"></label>' +
-      '<label style="display:block;margin-bottom:8px">Compose Path<br><input id="xf-path" value="docker-compose.yml" style="width:100%;padding:6px;box-sizing:border-box"></label>' +
-      '<label style="display:block;margin-bottom:8px">Sync Interval (seconds, 0=manual)<br><input id="xf-interval" type="number" value="0" style="width:100%;padding:6px;box-sizing:border-box"></label>' +
-      '<button id="xf-submit" style="padding:8px 20px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-right:8px">Create</button>' +
-      '<button id="xf-cancel" style="padding:8px 20px;background:#999;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel</button>';
-    page.appendChild(form);
+    form.id = 'xpx-gitops-form';
+    form.style.cssText = 'margin-top:12px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:4px;';
+    form.innerHTML = '<div style="font-weight:600;margin-bottom:8px">New GitOps Stack</div>' +
+      '<input id="xf-name" placeholder="Stack Name" style="width:100%;padding:6px;margin-bottom:6px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
+      '<input id="xf-repo" placeholder="Repository URL" style="width:100%;padding:6px;margin-bottom:6px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
+      '<div style="display:flex;gap:6px;margin-bottom:6px"><input id="xf-branch" value="main" placeholder="Branch" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:3px"><input id="xf-path" value="docker-compose.yml" placeholder="Compose path" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:3px"></div>' +
+      '<input id="xf-interval" type="number" value="0" placeholder="Sync interval (sec)" style="width:100%;padding:6px;margin-bottom:8px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
+      '<button id="xf-submit" style="padding:6px 16px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-right:6px;font-size:13px">Create</button>' +
+      '<button id="xf-cancel" style="padding:6px 16px;background:#999;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Cancel</button>';
+    parent.appendChild(form);
     document.getElementById('xf-cancel').onclick = function () { form.remove(); };
     document.getElementById('xf-submit').onclick = function () {
       api('POST', '/api/gitops', {
@@ -130,65 +125,46 @@
     };
   }
 
-  /* ── Image Updates page ── */
-  function renderUpdates(page) {
-    page.innerHTML = '<h2 style="margin:0 0 16px;font-weight:600">Image Updates</h2><button id="xpx-check-updates" style="padding:8px 20px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px">Check Now</button><div id="xpx-updates-result" style="margin-top:16px"></div>';
-    document.getElementById('xpx-check-updates').onclick = function () {
+  /* ── Image Updates ── */
+  function renderUpdates(el) {
+    el.innerHTML = '<button id="xpx-check-btn" style="padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Check Now</button><div id="xpx-updates-result" style="margin-top:12px"></div>';
+    document.getElementById('xpx-check-btn').onclick = function () {
       var btn = this; btn.disabled = true; btn.textContent = 'Checking...';
       api('POST', '/api/services/check-updates').then(function (data) {
         btn.disabled = false; btn.textContent = 'Check Now';
-        var el = document.getElementById('xpx-updates-result');
-        if (!data || data.length === 0) { el.innerHTML = '<p style="color:#4caf50;font-weight:500">All images are up to date.</p>'; return; }
-        var html = '<p style="color:#ff9800;font-weight:500">' + data.length + ' update(s) available:</p><ul style="margin:8px 0;padding-left:20px">';
-        data.forEach(function (u) { html += '<li style="margin:4px 0">' + u.serviceName + ': <code>' + u.image + '</code></li>'; });
-        el.innerHTML = html + '</ul>';
+        var r = document.getElementById('xpx-updates-result');
+        if (!data || data.length === 0) { r.innerHTML = '<p style="color:#4caf50;margin:0">All images are up to date.</p>'; return; }
+        var html = '<p style="color:#ff9800;margin:0 0 8px">' + data.length + ' update(s) available:</p><ul style="margin:0;padding-left:20px">';
+        data.forEach(function (u) { html += '<li style="margin:2px 0;font-size:13px">' + u.serviceName + '</li>'; });
+        r.innerHTML = html + '</ul>';
       });
     };
   }
 
-  /* ── System Prune page ── */
-  function renderPrune(page) {
-    page.innerHTML = '<h2 style="margin:0 0 16px;font-weight:600">System Prune</h2><p style="color:#666;margin-bottom:16px">Remove unused Docker resources (dangling images, orphan volumes, unused networks).</p><button id="xpx-prune-preview" style="padding:8px 20px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;margin-right:8px">Preview</button><button id="xpx-prune-exec" style="padding:8px 20px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px">Prune Now</button><div id="xpx-prune-result" style="margin-top:16px"></div>';
-    document.getElementById('xpx-prune-preview').onclick = function () { doPrune(true); };
-    document.getElementById('xpx-prune-exec').onclick = function () { if (confirm('Remove all unused resources? This cannot be undone.')) doPrune(false); };
+  /* ── System Prune ── */
+  function renderPrune(el) {
+    el.innerHTML = '<p style="color:#666;margin:0 0 12px;font-size:13px">Remove unused Docker resources (dangling images, orphan volumes, unused networks).</p><button id="xpx-preview-btn" style="padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-right:6px">Preview</button><button id="xpx-prune-btn" style="padding:6px 16px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Prune Now</button><div id="xpx-prune-result" style="margin-top:12px"></div>';
+    document.getElementById('xpx-preview-btn').onclick = function () { doPrune(true); };
+    document.getElementById('xpx-prune-btn').onclick = function () { if (confirm('Remove all unused resources?')) doPrune(false); };
   }
 
   function doPrune(dryRun) {
     api('POST', '/api/system/prune', { images: true, volumes: true, networks: true, dryRun: dryRun }).then(function (r) {
       var el = document.getElementById('xpx-prune-result');
       if (!el) return;
-      var label = dryRun ? 'Preview (no changes made)' : 'Cleanup completed';
+      var label = dryRun ? 'Preview (no changes)' : 'Cleanup completed';
       var color = dryRun ? '#1976d2' : '#4caf50';
-      el.innerHTML = '<p style="color:' + color + ';font-weight:500">' + label + '</p>' +
-        '<ul style="margin:8px 0;padding-left:20px">' +
+      el.innerHTML = '<p style="color:' + color + ';font-weight:500;margin:0 0 4px">' + label + '</p>' +
+        '<ul style="margin:0;padding-left:20px;font-size:13px">' +
         '<li>Images: ' + (r.images ? r.images.count : 0) + ' (' + (r.images ? (r.images.spaceReclaimed / 1e9).toFixed(1) : 0) + ' GB)</li>' +
         '<li>Volumes: ' + (r.volumes ? r.volumes.count : 0) + '</li>' +
         '<li>Networks: ' + (r.networks ? r.networks.count : 0) + '</li></ul>';
     });
   }
 
-  /* ── Main loop ── */
-  window.addEventListener('hashchange', function () { setTimeout(function () { injectSidebar(); renderPage(); }, 300); });
-
-  // Use MutationObserver to re-inject when ClojureScript re-renders nav
-  function startObserver() {
-    var nav = document.querySelector('nav');
-    if (!nav) return false;
-    var observer = new MutationObserver(function () {
-      if (!document.getElementById('xpx-sidebar')) injectSidebar();
-    });
-    observer.observe(nav, { childList: true, subtree: true });
-    return true;
-  }
-
-  // Init: wait for nav to appear, then inject + observe
+  /* ── Init: wait for login then show button ── */
   var initInterval = setInterval(function () {
     getToken();
-    if (!TOKEN) return;
-    var nav = document.querySelector('nav');
-    if (!nav || !nav.querySelector('hr')) return;
-    injectSidebar();
-    renderPage();
-    if (startObserver()) clearInterval(initInterval);
-  }, 500);
+    if (TOKEN) { createToolsButton(); clearInterval(initInterval); }
+  }, 1000);
 })();
