@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -68,6 +69,27 @@ func listRegistryRepos(reg map[string]any) ([]map[string]any, error) {
 	result := make([]map[string]any, len(data.Repositories))
 	for i, r := range data.Repositories {
 		result[i] = map[string]any{"name": r}
+	}
+	return result, nil
+}
+
+func fetchRegistryV2Tags(fullRepo string) ([]map[string]any, error) {
+	// fullRepo format: registry.example.com/org/repo
+	parts := strings.SplitN(fullRepo, "/", 2)
+	if len(parts) < 2 { return nil, fmt.Errorf("invalid repo format") }
+	registry, repo := parts[0], parts[1]
+	u := fmt.Sprintf("https://%s/v2/%s/tags/list", registry, repo)
+	resp, err := httpClient.Get(u)
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 { return nil, fmt.Errorf("registry returned %d", resp.StatusCode) }
+	var data struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil { return nil, err }
+	result := make([]map[string]any, len(data.Tags))
+	for i, t := range data.Tags {
+		result[i] = map[string]any{"name": t}
 	}
 	return result, nil
 }

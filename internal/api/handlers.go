@@ -1110,8 +1110,12 @@ func PublicRepositories(w http.ResponseWriter, r *http.Request) {
 func ImageTags(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "*")
 	if repo == "" { json200(w, []any{}); return }
+	// Try DockerHub first, then private registry v2
 	tags, err := fetchDockerHubTags(repo)
-	if err != nil { jsonErr(w, 500, err.Error()); return }
+	if err != nil {
+		tags, err = fetchRegistryV2Tags(repo)
+		if err != nil { json200(w, []any{}); return }
+	}
 	json200(w, tags)
 }
 
