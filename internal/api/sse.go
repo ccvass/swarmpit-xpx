@@ -140,10 +140,6 @@ func fetchSubscriptionData(sub sseSubscription) any {
 		tasks, _ := docker.Tasks()
 		networks, _ := docker.Networks()
 		return mapServices(services, tasks, networks, info)
-	case "service-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchServiceInfoData(id, info)
 	case "stack-list":
 		services, _ := docker.Services()
 		tasks, _ := docker.Tasks()
@@ -152,10 +148,6 @@ func fetchSubscriptionData(sub sseSubscription) any {
 	case "node-list":
 		nodes, _ := docker.Nodes()
 		return mapNodes(nodes)
-	case "node-info":
-		id := sub.Params["id"]
-		if id == "" { return nil }
-		return fetchNodeInfoData(id, info)
 	case "task-list":
 		tasks, _ := docker.Tasks()
 		services, _ := docker.Services()
