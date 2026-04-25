@@ -345,13 +345,97 @@ func StackSecrets(w http.ResponseWriter, r *http.Request) {
 }
 
 func StackFile(w http.ResponseWriter, r *http.Request) {
-	json200(w, map[string]any{"name": chi.URLParam(r, "name"), "spec": ""})
+	name := chi.URLParam(r, "name")
+	spec := generateStackCompose(name)
+	json200(w, map[string]any{"name": name, "spec": spec})
 }
 
 func StackCompose(w http.ResponseWriter, r *http.Request) {
-	json200(w, map[string]string{"compose": ""})
+	name := chi.URLParam(r, "name")
+	json200(w, map[string]string{"compose": generateStackCompose(name)})
 }
 
+func generateStackCompose(stackName string) string {
+	services, _ := docker.Services()
+	var stackServices []swarm.Service
+	for _, s := range services {
+		if s.Spec.Labels["com.docker.stack.namespace"] == stackName {
+			stackServices = append(stackServices, s)
+		}
+	}
+	if len(stackServices) == 0 { return "" }
+
+	// Build compose YAML from service specs
+	compose := "version: '3.8'\nservices:\n"
+	for _, svc := range stackServices {
+		svcName := strings.TrimPrefix(svc.Spec.Name, stackName+"_")
+		compose += "  " + svcName + ":\n"
+		compose += "    image: " + svc.Spec.TaskTemplate.ContainerSpec.Image + "\n"
+		if len(svc.Spec.TaskTemplate.ContainerSpec.Env) > 0 {
+			compose += "    environment:\n"
+			for _, e := range svc.Spec.TaskTemplate.ContainerSpec.Env {
+				compose += "      - " + e + "\n"
+			}
+		}
+		if svc.Spec.TaskTemplate.ContainerSpec.Command != nil {
+			compose += "    command:"
+			for _, c := range svc.Spec.TaskTemplate.ContainerSpec.Command {
+				compose += " " + c
+			}
+			compose += "\n"
+		}
+		if svc.Endpoint.Ports != nil {
+			compose += "    ports:\n"
+			for _, p := range svc.Endpoint.Ports {
+				compose += fmt.Sprintf("      - \"%d:%d\"\n", p.PublishedPort, p.TargetPort)
+			}
+		}
+		if svc.Spec.TaskTemplate.ContainerSpec.Mounts != nil {
+			compose += "    volumes:\n"
+			for _, m := range svc.Spec.TaskTemplate.ContainerSpec.Mounts {
+				compose += fmt.Sprintf("      - %s:%s\n", m.Source, m.Target)
+			}
+		}
+		// Networks
+		if svc.Spec.TaskTemplate.Networks != nil {
+			compose += "    networks:\n"
+			networks, _ := docker.Networks()
+			for _, n := range svc.Spec.TaskTemplate.Networks {
+				for _, net := range networks {
+					if net.ID == n.Target {
+						compose += "      - " + net.Name + "\n"
+					}
+				}
+			}
+		}
+	}
+	return compose
+}
+
+func ServiceCompose(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	svcID := resolveServiceID(id)
+	if svcID == "" { svcID = id }
+	svc, err := docker.Service(svcID)
+	if err != nil { json200(w, map[string]string{"compose": ""}); return }
+
+	stackName := svc.Spec.Labels["com.docker.stack.namespace"]
+	svcName := svc.Spec.Name
+	if stackName != "" {
+		svcName = strings.TrimPrefix(svcName, stackName+"_")
+	}
+
+	compose := "version: '3.8'\nservices:\n"
+	compose += "  " + svcName + ":\n"
+	compose += "    image: " + svc.Spec.TaskTemplate.ContainerSpec.Image + "\n"
+	if len(svc.Spec.TaskTemplate.ContainerSpec.Env) > 0 {
+		compose += "    environment:\n"
+		for _, e := range svc.Spec.TaskTemplate.ContainerSpec.Env {
+			compose += "      - " + e + "\n"
+		}
+	}
+	json200(w, map[string]string{"compose": compose})
+}
 
 // Stats returns cluster resource stats (CPU, memory, disk from node resources)
 func Stats(w http.ResponseWriter, r *http.Request) {
@@ -695,10 +779,6 @@ func ServiceNetworks(w http.ResponseWriter, r *http.Request) {
 	}
 	if result == nil { result = []any{} }
 	json200(w, result)
-}
-
-func ServiceCompose(w http.ResponseWriter, r *http.Request) {
-	json200(w, map[string]string{"compose": ""})
 }
 
 // Timeseries (empty — no historical data in Go backend yet)
