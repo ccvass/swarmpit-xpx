@@ -1190,7 +1190,14 @@ func PublicRepositories(w http.ResponseWriter, r *http.Request) {
 func ImageTags(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "*")
 	if repo == "" { json200(w, []any{}); return }
-	// Try DockerHub first, then private registry v2
+	// Check if it's a private registry image (contains a dot in the first segment)
+	parts := strings.SplitN(repo, "/", 2)
+	if len(parts) >= 2 && strings.Contains(parts[0], ".") {
+		host := parts[0]
+		tags, err := fetchAuthenticatedTags(host, parts[1])
+		if err == nil { json200(w, tags); return }
+	}
+	// Try DockerHub, then generic v2
 	tags, err := fetchDockerHubTags(repo)
 	if err != nil {
 		tags, err = fetchRegistryV2Tags(repo)

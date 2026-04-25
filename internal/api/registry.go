@@ -7,9 +7,60 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ccvass/swarmpit-xpx/internal/store"
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
+
+func fetchAuthenticatedTags(host, repo string) ([]map[string]any, error) {
+	reg, err := store.FindRegistryByHost(host)
+	if err != nil { return nil, err }
+	// GHCR token-based auth
+	if host == "ghcr.io" {
+		username, _ := reg["username"].(string)
+		password, _ := reg["password"].(string)
+		if password == "" { password, _ = reg["token"].(string) }
+		if password == "" { return nil, fmt.Errorf("no credentials") }
+		// Get token from ghcr.io auth endpoint
+		tokenURL := fmt.Sprintf("https://ghcr.io/token?scope=repository:%s:pull&service=ghcr.io", repo)
+		req, _ := http.NewRequest("GET", tokenURL, nil)
+		if username == "" { username = "token" }
+		req.SetBasicAuth(username, password)
+		resp, err := httpClient.Do(req)
+		if err != nil { return nil, err }
+		defer resp.Body.Close()
+		var tokenResp struct{ Token string `json:"token"` }
+		json.NewDecoder(resp.Body).Decode(&tokenResp)
+		if tokenResp.Token == "" { return nil, fmt.Errorf("auth failed") }
+		// Fetch tags with bearer token
+		tagsReq, _ := http.NewRequest("GET", fmt.Sprintf("https://ghcr.io/v2/%s/tags/list", repo), nil)
+		tagsReq.Header.Set("Authorization", "Bearer "+tokenResp.Token)
+		tresp, err := httpClient.Do(tagsReq)
+		if err != nil { return nil, err }
+		defer tresp.Body.Close()
+		var data struct{ Tags []string `json:"tags"` }
+		json.NewDecoder(tresp.Body).Decode(&data)
+		result := make([]map[string]any, len(data.Tags))
+		for i, t := range data.Tags { result[i] = map[string]any{"name": t} }
+		return result, nil
+	}
+	// Generic v2 with basic auth
+	username, _ := reg["username"].(string)
+	password, _ := reg["password"].(string)
+	u := fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo)
+	req, _ := http.NewRequest("GET", u, nil)
+	if username != "" && password != "" { req.SetBasicAuth(username, password) }
+	resp, err := httpClient.Do(req)
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 { return nil, fmt.Errorf("registry returned %d", resp.StatusCode) }
+	var data struct{ Tags []string `json:"tags"` }
+	json.NewDecoder(resp.Body).Decode(&data)
+	result := make([]map[string]any, len(data.Tags))
+	for i, t := range data.Tags { result[i] = map[string]any{"name": t} }
+	return result, nil
+}
 
 func searchDockerHub(query string) ([]map[string]any, error) {
 	u := fmt.Sprintf("https://hub.docker.com/v2/search/repositories/?query=%s&page_size=20", url.QueryEscape(query))

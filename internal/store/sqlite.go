@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -335,6 +336,25 @@ func UpdateRegistry(id string, reg map[string]any) error {
 	data, _ := json.Marshal(reg)
 	_, err := db.Exec("UPDATE registries SET name=?, url=?, data=? WHERE id=?", name, url, string(data), id)
 	return err
+}
+
+func FindRegistryByHost(host string) (map[string]any, error) {
+	rows, err := db.Query("SELECT id, type, name, url, data FROM registries")
+	if err != nil { return nil, err }
+	defer rows.Close()
+	for rows.Next() {
+		var id, rtype, name, u, data string
+		rows.Scan(&id, &rtype, &name, &u, &data)
+		if strings.Contains(u, host) {
+			reg := map[string]any{"id": id, "type": rtype, "name": name, "url": u}
+			var extra map[string]any
+			if json.Unmarshal([]byte(data), &extra) == nil {
+				for k, v := range extra { reg[k] = v }
+			}
+			return reg, nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
 }
 
 func DeleteRegistry(id string) error {

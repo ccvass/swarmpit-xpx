@@ -162,9 +162,31 @@
     });
   }
 
+  /* ── Stack compose editor auto-fill ── */
+  function initComposeAutoFill() {
+    var hash = window.location.hash;
+    if (hash.indexOf('/stacks/') === -1 || hash.indexOf('/compose') === -1) return;
+    var m = hash.match(/\/stacks\/([^/]+)/);
+    if (!m) return;
+    var stackName = m[1];
+    var attempts = 0;
+    var iv = setInterval(function () {
+      if (++attempts > 15) { clearInterval(iv); return; }
+      var el = document.querySelector('.CodeMirror');
+      if (!el || !el.CodeMirror) return;
+      var cm = el.CodeMirror;
+      if (cm.getValue().trim()) { clearInterval(iv); return; }
+      clearInterval(iv);
+      api('GET', '/api/stacks/' + stackName + '/compose').then(function (data) {
+        if (data && data.compose && !cm.getValue().trim()) cm.setValue(data.compose);
+      });
+    }, 2000);
+  }
+
   /* ── Init: wait for login then show button ── */
   var initInterval = setInterval(function () {
     getToken();
-    if (TOKEN) { createToolsButton(); clearInterval(initInterval); }
+    if (TOKEN) { createToolsButton(); clearInterval(initInterval); initComposeAutoFill(); }
   }, 1000);
+  window.addEventListener('hashchange', function () { getToken(); if (TOKEN) initComposeAutoFill(); });
 })();
