@@ -78,8 +78,11 @@ var ITEMS=[
 {id:'audit',label:'Audit Log',icon:ICONS.audit}
 ];
 
+function getToken(){try{var t=localStorage.getItem('token')||sessionStorage.getItem('token');return t?t.replace(/^"|"$/g,''):'';}catch(e){return '';}}
 function api(method,path,body){
+  var token=getToken();
   var opts={method:method,headers:{'Content-Type':'application/json'}};
+  if(token)opts.headers['Authorization']=token;
   if(body)opts.body=JSON.stringify(body);
   return fetch(path,opts).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e})});
 }
