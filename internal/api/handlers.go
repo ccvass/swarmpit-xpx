@@ -991,7 +991,34 @@ func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	logs, err := docker.ServiceLogs(svcID, r.URL.Query().Get("tail"))
 	if err != nil { jsonErr(w, 500, err.Error()); return }
-	json200(w, map[string]string{"logs": logs})
+	// Parse raw logs into array of {line, task, timestamp} objects
+	// Docker log format: "TIMESTAMP TASKID MESSAGE" per line
+	entries := []map[string]any{}
+	for _, raw := range strings.Split(logs, "\n") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" { continue }
+		entry := map[string]any{"line": raw}
+		// Try to parse "TIMESTAMP TASKNAME.SLOT.TASKID@NODE MESSAGE"
+		parts := strings.SplitN(raw, " ", 3)
+		if len(parts) >= 2 {
+			entry["timestamp"] = parts[0]
+			// Second part may contain task info like "serviceName.1.taskID@node"
+			taskParts := strings.SplitN(parts[1], ".", 3)
+			if len(taskParts) >= 3 {
+				atIdx := strings.Index(taskParts[2], "@")
+				if atIdx > 0 {
+					entry["task"] = taskParts[2][:atIdx]
+				} else {
+					entry["task"] = taskParts[2]
+				}
+			}
+			if len(parts) >= 3 {
+				entry["line"] = parts[2]
+			}
+		}
+		entries = append(entries, entry)
+	}
+	json200(w, entries)
 }
 
 func ServiceDelete(w http.ResponseWriter, r *http.Request) {
