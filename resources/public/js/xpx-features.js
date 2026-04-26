@@ -128,7 +128,7 @@ setInterval(injectSidebar,2000);
 /* Page rendering */
 function getPage(){
   var p=document.getElementById('xpx-page');
-  if(!p){p=document.createElement('div');p.id='xpx-page';p.style.cssText='position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;z-index:1200;padding:24px;overflow:auto';
+  if(!p){p=document.createElement('div');p.id='xpx-page';p.style.cssText='position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;z-index:1200;padding:80px 24px 24px;overflow:auto';
     var main=document.querySelector('main')||document.body;main.style.position='relative';main.appendChild(p);}
   p.style.display='block';return p;
 }
