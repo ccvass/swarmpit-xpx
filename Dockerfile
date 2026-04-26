@@ -112,6 +112,11 @@ RUN HASH=$(md5sum /app/public/img/logo.svg | cut -c1-8) && \
     sed -i "s|img/logo\.svg|img/logo.${HASH}.svg|g" /app/public/js/main.js /app/public/index.html && \
     sed -i "s|img/icon\.svg|img/icon.${HASH}.svg|g" /app/public/js/main.js /app/public/index.html
 
+# Fix null-safety in MUI Autocomplete options (ce.filter → (ce||[]).filter)
+RUN sed -i \
+    -e 's/y(ce\.filter/y((ce||[]).filter/g' \
+    /app/public/js/main.js
+
 # Replace branding text in compiled JS
 RUN sed -i \
     -e 's/swarmpit\.io/swarmpit-xpx/g' \
