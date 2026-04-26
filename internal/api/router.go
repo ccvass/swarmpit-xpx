@@ -49,6 +49,10 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Get("/oauth/{provider}/callback", OAuthCallback)
 	r.Post("/api/webhooks/{token}", WebhookTrigger)
 	r.Post("/api/webhooks/git/{id}", GitWebhookHandler)
+	// SSE must be public — EventSource API cannot send Authorization headers.
+	// The legacy frontend authenticates via SLT query param.
+	r.Get("/events", SSEHandler)
+	r.Post("/events", EventPush)
 	r.Get("/slt", func(w http.ResponseWriter, r *http.Request) {
 		json200(w, map[string]string{"slt": "go-backend-slt"})
 	})
@@ -58,8 +62,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Use(auth.Middleware)
 
 		// #71: SSE and agent events now require auth
-		r.Get("/events", SSEHandler)
-		r.Post("/events", EventPush)
+		// NOTE: moved back to public routes — EventSource cannot send headers
 
 		r.Get("/api/nodes", NodeList)
 		r.Get("/api/nodes/ts", NodeTimeseries)

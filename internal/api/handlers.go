@@ -482,6 +482,9 @@ func generateStackCompose(stackName string) string {
 	for _, svc := range stackServices {
 		svcName := strings.TrimPrefix(svc.Spec.Name, stackName+"_")
 		cs := svc.Spec.TaskTemplate.ContainerSpec
+		if cs == nil {
+			continue
+		}
 		tt := svc.Spec.TaskTemplate
 		s := map[string]any{"image": cs.Image}
 
@@ -524,7 +527,7 @@ func generateStackCompose(stackName string) string {
 		if len(cs.Sysctls) > 0 {
 			s["sysctls"] = cs.Sysctls
 		}
-		if len(cs.DNSConfig.Nameservers) > 0 {
+		if cs.DNSConfig != nil && len(cs.DNSConfig.Nameservers) > 0 {
 			s["dns"] = cs.DNSConfig.Nameservers
 		}
 		if len(cs.Hosts) > 0 {
