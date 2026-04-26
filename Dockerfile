@@ -113,8 +113,9 @@ RUN HASH=$(md5sum /app/public/img/logo.svg | cut -c1-8) && \
     sed -i "s|img/icon\.svg|img/icon.${HASH}.svg|g" /app/public/js/main.js /app/public/index.html
 
 # Fix MUI Autocomplete: CLJS PersistentVector is not a JS Array, so .filter fails.
-# Monkey-patch Array.isArray to recognize CLJS vectors, and patch Object.prototype
-# This is handled at runtime by xpx-features.js instead of fragile sed patches.
+# There is exactly 1 occurrence of ce.filter in the compiled Autocomplete component.
+# Replace it with a safe version that converts to array first.
+RUN sed -i 's/y(ce\.filter/y((Array.isArray(ce)?ce:Array.prototype.slice.call(ce||[])).filter/g' /app/public/js/main.js
 
 # Replace branding text in compiled JS
 RUN sed -i \
