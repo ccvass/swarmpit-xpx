@@ -467,7 +467,10 @@ func StackFile(w http.ResponseWriter, r *http.Request) {
 
 func StackCompose(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
-	json200(w, map[string]string{"compose": generateStackCompose(name)})
+	json200(w, map[string]any{
+		"name": name,
+		"spec": map[string]string{"compose": generateStackCompose(name)},
+	})
 }
 
 func generateStackCompose(stackName string) string {
