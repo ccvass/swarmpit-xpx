@@ -194,6 +194,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Get("/api/registry/{type}/{id}/repositories", RegistryRepositories)
 		r.Get("/api/public/repositories", PublicRepositories)
 		r.Get("/api/tags/*", ImageTags)
+		r.Get("/api/repository/tags", RepositoryTags)
 		r.Get("/exec/{id}", ExecHandler)
 
 		r.Post("/api/services/{id}/dashboard", DashboardPinService)

@@ -1622,9 +1622,25 @@ func PublicRepositories(w http.ResponseWriter, r *http.Request) {
 	json200(w, repos)
 }
 
+func RepositoryTags(w http.ResponseWriter, r *http.Request) {
+	repo := r.URL.Query().Get("repository")
+	if repo == "" {
+		json200(w, []any{})
+		return
+	}
+	fetchAndReturnTags(w, repo)
+}
+
 func ImageTags(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "*")
-	if repo == "" { json200(w, []any{}); return }
+	if repo == "" {
+		json200(w, []any{})
+		return
+	}
+	fetchAndReturnTags(w, repo)
+}
+
+func fetchAndReturnTags(w http.ResponseWriter, repo string) {
 	// Check if it's a private registry image (contains a dot in the first segment)
 	parts := strings.SplitN(repo, "/", 2)
 	if len(parts) >= 2 && strings.Contains(parts[0], ".") {
