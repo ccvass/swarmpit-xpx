@@ -56,7 +56,7 @@ func rateLimitMiddleware(lim *ipRateLimiter) func(http.Handler) http.Handler {
 
 var (
 	// 100 req/min general, 5 req/min for login
-	apiLimiter   = newIPRateLimiter(rate.Limit(100.0/60.0), 10)
+	apiLimiter   = newIPRateLimiter(rate.Limit(20), 50)
 	loginLimiter = newIPRateLimiter(rate.Limit(5.0/60.0), 5)
 )
 
