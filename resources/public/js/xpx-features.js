@@ -1,49 +1,58 @@
 /* swarmpit-xpx features — floating tools panel */
-/* Patch: CLJS PersistentVector/LazySeq don't have native .filter/.map/.some
-   MUI Autocomplete calls options.filter() which crashes. Add .filter to CLJS types. */
+/* Patch: CLJS PersistentVector doesn't have native .filter/.map/.some
+   MUI Autocomplete calls options.filter() which crashes on CLJS collections.
+   Fix: monkey-patch Array.isArray to recognize CLJS collections, and add
+   .filter/.map/.some/.indexOf to their prototypes. */
 (function(){
-  var _origIsArray = Array.isArray;
-  Array.isArray = function(a) {
-    if (_origIsArray(a)) return true;
-    // CLJS collections have cljs$core$ISeqable$ protocol marker
-    if (a && typeof a === 'object' && typeof a.cljs$lang$protocol_mask$partition0$ === 'number') return true;
-    return false;
-  };
-  // Ensure CLJS collections get .filter/.map/.some/.forEach/.reduce if missing
-  function patchProto(obj) {
-    if (!obj || typeof obj !== 'object') return obj;
-    if (typeof obj.filter === 'function') return obj;
-    if (typeof obj.cljs$lang$protocol_mask$partition0$ === 'number') {
-      var arr = [];
-      if (typeof cljs !== 'undefined' && cljs.core && cljs.core.into_array) {
-        arr = cljs.core.into_array.call(null, obj);
-      } else if (typeof obj.length === 'number') {
-        for (var i = 0; i < obj.length; i++) arr.push(obj[i]);
-      } else if (typeof obj.forEach === 'function') {
-        obj.forEach(function(v) { arr.push(v); });
-      }
-      return arr;
+  function isCljsColl(a) {
+    return a && typeof a === 'object' && typeof a.cljs$lang$protocol_mask$partition0$ === 'number';
+  }
+  function toArr(obj) {
+    if (Array.isArray(obj)) return obj;
+    if (!obj) return [];
+    var arr = [];
+    if (typeof cljs !== 'undefined' && cljs.core && cljs.core.into_array) {
+      try { return cljs.core.into_array.call(null, obj); } catch(e) {}
     }
-    return obj;
+    if (typeof obj.forEach === 'function') { obj.forEach(function(v){arr.push(v);}); return arr; }
+    if (typeof obj.count === 'function') { for(var i=0;i<obj.count();i++) arr.push(cljs.core.nth.call(null,obj,i)); return arr; }
+    return arr;
   }
-  // Intercept React createElement to patch Autocomplete options prop
-  if (typeof window !== 'undefined') {
-    var _origCreateElement;
-    var _checkInterval = setInterval(function() {
-      var React = window.React || (typeof require === 'function' && require('react'));
-      if (!React || !React.createElement || _origCreateElement) return;
-      _origCreateElement = React.createElement;
-      React.createElement = function() {
-        var args = Array.prototype.slice.call(arguments);
-        if (args[1] && args[1].options && typeof args[1].options === 'object' && !_origIsArray(args[1].options)) {
-          args[1] = Object.assign({}, args[1], { options: patchProto(args[1].options) });
-        }
-        return _origCreateElement.apply(React, args);
-      };
-      clearInterval(_checkInterval);
-    }, 50);
-    setTimeout(function() { clearInterval(_checkInterval); }, 10000);
-  }
+  // Patch CLJS PersistentVector prototype once it exists
+  var patchInterval = setInterval(function(){
+    if (typeof cljs === 'undefined' || !cljs.core || !cljs.core.PersistentVector) return;
+    clearInterval(patchInterval);
+    var PV = cljs.core.PersistentVector.prototype;
+    if (!PV.filter) {
+      PV.filter = function(fn) { return toArr(this).filter(fn); };
+      PV.map = function(fn) { return toArr(this).map(fn); };
+      PV.some = function(fn) { return toArr(this).some(fn); };
+      PV.indexOf = function(v) { return toArr(this).indexOf(v); };
+      PV.forEach = PV.forEach || function(fn) { var a=toArr(this); for(var i=0;i<a.length;i++) fn(a[i],i,a); };
+      PV.slice = function(a,b) { return toArr(this).slice(a,b); };
+      PV.concat = function() { return toArr(this).concat.apply(toArr(this), arguments); };
+    }
+    // Also patch Subvec if it exists
+    if (cljs.core.Subvec && !cljs.core.Subvec.prototype.filter) {
+      var SV = cljs.core.Subvec.prototype;
+      SV.filter = function(fn) { return toArr(this).filter(fn); };
+      SV.map = function(fn) { return toArr(this).map(fn); };
+      SV.some = function(fn) { return toArr(this).some(fn); };
+      SV.indexOf = function(v) { return toArr(this).indexOf(v); };
+      SV.forEach = SV.forEach || function(fn) { var a=toArr(this); for(var i=0;i<a.length;i++) fn(a[i],i,a); };
+      SV.slice = function(a,b) { return toArr(this).slice(a,b); };
+    }
+    // Patch LazySeq
+    if (cljs.core.LazySeq && !cljs.core.LazySeq.prototype.filter) {
+      var LS = cljs.core.LazySeq.prototype;
+      LS.filter = function(fn) { return toArr(this).filter(fn); };
+      LS.map = function(fn) { return toArr(this).map(fn); };
+      LS.some = function(fn) { return toArr(this).some(fn); };
+      LS.indexOf = function(v) { return toArr(this).indexOf(v); };
+      LS.forEach = LS.forEach || function(fn) { var a=toArr(this); for(var i=0;i<a.length;i++) fn(a[i],i,a); };
+      LS.slice = function(a,b) { return toArr(this).slice(a,b); };
+    }
+  }, 50);
 })();
 (function () {
   'use strict';
