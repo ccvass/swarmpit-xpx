@@ -463,15 +463,36 @@ func getNodeStatsCache() map[string]map[string]any {
 func getTaskStats(taskName, taskID string) map[string]any {
 	agentStatsCache.RLock()
 	defer agentStatsCache.RUnlock()
-	// Agent stores tasks by container ID with name like "/serviceName.slot.taskID"
 	needle := "." + taskID
 	for _, tm := range agentStatsCache.tasks {
 		if name, ok := tm["name"].(string); ok && strings.HasSuffix(name, needle) {
-			cpu := 0.0
+			cpuPct := 0.0
 			mem := 0.0
-			if v, ok := tm["cpuPercentage"].(float64); ok { cpu = v / 100.0 }
+			if v, ok := tm["cpuPercentage"].(float64); ok { cpuPct = v }
 			if v, ok := tm["memory"].(float64); ok { mem = v }
-			return map[string]any{"cpu": cpu, "memory": mem}
+			memLimit := 0.0
+			if v, ok := tm["memoryLimit"].(float64); ok { memLimit = v }
+			cpuLimit := 0.0
+			// Get node CPU count from node stats
+			if nodeID, ok := tm["nodeId"].(string); ok {
+				if ns, ok := agentStatsCache.nodes[nodeID]; ok {
+					if c, ok := ns["cpu"].(map[string]any); ok {
+						if cores, ok := c["cores"].(float64); ok { cpuLimit = cores }
+					}
+				}
+			}
+			if cpuLimit == 0 { cpuLimit = 1 }
+			if memLimit == 0 { memLimit = mem * 2 } // fallback estimate
+			memPct := 0.0
+			if memLimit > 0 { memPct = (mem / memLimit) * 100 }
+			return map[string]any{
+				"cpu":              cpuPct / 100.0,
+				"cpuPercentage":    cpuPct,
+				"cpuLimit":         cpuLimit,
+				"memory":           mem,
+				"memoryPercentage": memPct,
+				"memoryLimit":      memLimit,
+			}
 		}
 	}
 	return nil
