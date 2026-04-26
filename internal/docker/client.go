@@ -1,8 +1,10 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -14,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 var cli *client.Client
@@ -23,6 +26,28 @@ func Init() error {
 	cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return fmt.Errorf("docker client init: %w", err)
+	}
+	return nil
+}
+
+// InitWithHost reinitializes the Docker client to point at a remote host (#104).
+func InitWithHost(host string) error {
+	if host == "" {
+		return Init()
+	}
+	var err error
+	cli, err = client.NewClientWithOpts(
+		client.WithHost(host),
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return fmt.Errorf("docker client init with host %s: %w", host, err)
+	}
+	// Verify connectivity
+	if _, err := Ping(); err != nil {
+		// Rollback to local on failure
+		_ = Init()
+		return fmt.Errorf("cluster unreachable at %s: %w", host, err)
 	}
 	return nil
 }
@@ -186,9 +211,16 @@ func ServiceLogs(id string, tail string) (string, error) {
 		return "", fmt.Errorf("service logs %s: %w", id, err)
 	}
 	defer reader.Close()
-	buf := make([]byte, 1024*1024)
-	n, _ := reader.Read(buf)
-	return string(buf[:n]), nil
+	var buf bytes.Buffer
+	// Demultiplex Docker log stream (8-byte header per frame)
+	if _, err := stdcopy.StdCopy(&buf, &buf, reader); err != nil {
+		// Fallback: raw TTY stream (no multiplexing)
+		buf.Reset()
+		if _, err := io.Copy(&buf, reader); err != nil {
+			return "", fmt.Errorf("read logs %s: %w", id, err)
+		}
+	}
+	return buf.String(), nil
 }
 
 func DeleteService(id string) error {

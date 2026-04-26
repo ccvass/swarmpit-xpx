@@ -46,6 +46,7 @@ func main() {
 	}
 	store.InitTeamPermissions()
 	store.InitClusters()
+	store.InitStackReplicas()
 	slog.Info("sqlite ready", "path", dbPath)
 
 	// #86: auto-create admin from env vars on first start
@@ -65,6 +66,11 @@ func main() {
 	}
 	ping, _ := docker.Ping()
 	slog.Info("docker connected", "api", ping.APIVersion)
+
+	// #101: warn if agent secret not configured
+	if os.Getenv("SWARMPIT_AGENT_SECRET") == "" {
+		slog.Warn("SWARMPIT_AGENT_SECRET not set — POST /events is unauthenticated")
+	}
 
 	api.InitTimeseries()
 	api.StartAlertChecker()

@@ -21,6 +21,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
 	"github.com/go-chi/chi/v5"
+	"github.com/pquerna/otp/totp"
 	"gopkg.in/yaml.v3"
 )
 
@@ -85,6 +86,18 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if user == nil {
 		jsonErr(w, 401, "The username or password you entered is incorrect.")
 		return
+	}
+	// #103: validate TOTP if enabled
+	if secret := store.GetTOTPSecret(user.Username); secret != "" {
+		otpCode := r.Header.Get("X-TOTP-Code")
+		if otpCode == "" {
+			jsonErr(w, 403, "TOTP code required")
+			return
+		}
+		if !totp.Validate(otpCode, secret) {
+			jsonErr(w, 403, "Invalid TOTP code")
+			return
+		}
 	}
 	token, _ := auth.GenerateJWT(user.Username, user.Role)
 	json200(w, map[string]string{"token": "Bearer " + token})
@@ -720,7 +733,22 @@ func generateStackCompose(stackName string) string {
 	if len(allNets) > 0 {
 		netDefs := map[string]any{}
 		for n := range allNets {
-			netDefs[n] = map[string]any{"external": true}
+			// Networks owned by this stack are internal; others are external
+			fullName := stackName + "_" + n
+			isStackNet := false
+			for _, net := range networks {
+				if net.Name == n || net.Name == fullName {
+					if net.Labels["com.docker.stack.namespace"] == stackName {
+						isStackNet = true
+					}
+					break
+				}
+			}
+			if isStackNet {
+				netDefs[n] = nil
+			} else {
+				netDefs[n] = map[string]any{"external": true}
+			}
 		}
 		compose["networks"] = netDefs
 	}
@@ -943,14 +971,22 @@ func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 		reader, err := cli.ServiceLogs(r.Context(), svcID, container.LogsOptions{ShowStdout: true, ShowStderr: true, Follow: true, Tail: "50", Timestamps: true})
 		if err != nil { jsonErr(w, 500, err.Error()); return }
 		defer reader.Close()
-		buf := make([]byte, 4096)
+		// Demultiplex: read 8-byte header + payload per frame
+		hdr := make([]byte, 8)
 		for {
-			n, err := reader.Read(buf)
-			if n > 0 {
-				fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(string(buf[:n])))
-				flusher.Flush()
+			if _, err := io.ReadFull(reader, hdr); err != nil {
+				return
 			}
-			if err != nil { return }
+			size := int(hdr[4])<<24 | int(hdr[5])<<16 | int(hdr[6])<<8 | int(hdr[7])
+			if size <= 0 || size > 1<<20 {
+				continue
+			}
+			payload := make([]byte, size)
+			if _, err := io.ReadFull(reader, payload); err != nil {
+				return
+			}
+			fmt.Fprintf(w, "data: %s\n\n", strings.TrimSpace(string(payload)))
+			flusher.Flush()
 		}
 	}
 	logs, err := docker.ServiceLogs(svcID, r.URL.Query().Get("tail"))
@@ -1649,8 +1685,24 @@ func NodeEdit(w http.ResponseWriter, r *http.Request) {
 // ── #48 Stack activate/deactivate ──
 
 func StackActivate(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(501)
-	json200(w, map[string]string{"error": "not implemented — requires remembering previous replica counts"})
+	name := chi.URLParam(r, "name")
+	svcs, _ := docker.Services()
+	saved := store.GetDeactivatedReplicas(name)
+	count := 0
+	for _, s := range svcs {
+		if s.Spec.Labels["com.docker.stack.namespace"] == name && s.Spec.Mode.Replicated != nil {
+			replicas := uint64(1)
+			if v, ok := saved[s.ID]; ok && v > 0 {
+				replicas = v
+			}
+			s.Spec.Mode.Replicated.Replicas = &replicas
+			if err := docker.UpdateService(s.ID, s.Version, s.Spec); err == nil {
+				count++
+			}
+		}
+	}
+	store.ClearDeactivatedReplicas(name)
+	json200(w, map[string]any{"status": "activated", "services": count})
 }
 
 func StackDeactivate(w http.ResponseWriter, r *http.Request) {
@@ -1660,6 +1712,10 @@ func StackDeactivate(w http.ResponseWriter, r *http.Request) {
 	zero := uint64(0)
 	for _, s := range svcs {
 		if s.Spec.Labels["com.docker.stack.namespace"] == name && s.Spec.Mode.Replicated != nil {
+			// Save current replica count before deactivation (#106)
+			if s.Spec.Mode.Replicated.Replicas != nil {
+				store.SaveDeactivatedReplicas(name, s.ID, *s.Spec.Mode.Replicated.Replicas)
+			}
 			s.Spec.Mode.Replicated.Replicas = &zero
 			if err := docker.UpdateService(s.ID, s.Version, s.Spec); err == nil {
 				count++
@@ -1786,21 +1842,39 @@ func DashboardPinNode(w http.ResponseWriter, r *http.Request) {
 
 // ── #52 Swagger/OpenAPI docs ──
 
-// #93: TOTP setup and verification
+// #103: TOTP setup with real TOTP secret generation
 func TOTPSetup(w http.ResponseWriter, r *http.Request) {
 	username := reqUser(r)
-	// Generate a random base32 secret (160 bits)
-	secret := fmt.Sprintf("SWARMPIT%s%d", username, time.Now().UnixNano())
-	encoded := base64.StdEncoding.EncodeToString([]byte(secret))[:20]
-	if err := store.SetTOTPSecret(username, encoded); err != nil {
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "swarmpit-xpx",
+		AccountName: username,
+	})
+	if err != nil {
+		jsonErr(w, 500, "totp generation failed: "+err.Error())
+		return
+	}
+	if err := store.SetTOTPSecret(username, key.Secret()); err != nil {
 		jsonErr(w, 500, err.Error())
 		return
 	}
-	json200(w, map[string]string{"secret": encoded, "issuer": "swarmpit-xpx", "account": username})
+	json200(w, map[string]string{"secret": key.Secret(), "url": key.URL(), "issuer": "swarmpit-xpx", "account": username})
 }
 
 func TOTPDisable(w http.ResponseWriter, r *http.Request) {
-	if err := store.ClearTOTPSecret(reqUser(r)); err != nil {
+	username := reqUser(r)
+	// Require valid OTP code to disable
+	var body struct {
+		Code string `json:"code"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	secret := store.GetTOTPSecret(username)
+	if secret != "" && body.Code != "" {
+		if !totp.Validate(body.Code, secret) {
+			jsonErr(w, 403, "invalid TOTP code")
+			return
+		}
+	}
+	if err := store.ClearTOTPSecret(username); err != nil {
 		jsonErr(w, 500, err.Error())
 		return
 	}
@@ -1879,8 +1953,15 @@ func ClusterDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func ClusterActivate(w http.ResponseWriter, r *http.Request) {
-	if err := store.SetActiveCluster(chi.URLParam(r, "id")); err != nil {
+	id := chi.URLParam(r, "id")
+	if err := store.SetActiveCluster(id); err != nil {
 		jsonErr(w, 500, err.Error())
+		return
+	}
+	// Reinitialize Docker client to point at the activated cluster (#104)
+	_, host := store.GetActiveCluster()
+	if err := docker.InitWithHost(host); err != nil {
+		jsonErr(w, 500, "cluster activation failed: "+err.Error())
 		return
 	}
 	json200(w, map[string]string{"status": "activated"})

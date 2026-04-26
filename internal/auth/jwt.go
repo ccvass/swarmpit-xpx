@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ccvass/swarmpit-xpx/internal/store"
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -91,6 +92,29 @@ func WriteOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Role") == "viewer" {
 			http.Error(w, `{"error":"Write access required"}`, http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// TeamPermissionCheck enforces RBAC on stack operations (#105).
+// Admins bypass; other users must have a matching team_permissions entry.
+func TeamPermissionCheck(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Role") == "admin" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		stackName := chi.URLParam(r, "name")
+		if stackName == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		username := r.Header.Get("X-User")
+		if !store.UserStackAccess(username, stackName) {
+			w.Header().Set("Content-Type", "application/json")
+			http.Error(w, `{"error":"Access denied: no team permission for stack '`+stackName+`'"}`, http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)

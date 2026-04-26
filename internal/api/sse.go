@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -232,50 +233,13 @@ func extractStacks(svcs []swarm.Service, tasks []swarm.Task, nets []types.Networ
 
 // fetchDashboardData returns full dashboard data
 func fetchDashboardData() map[string]any {
-	nodes, _ := docker.Nodes()
 	services, _ := docker.Services()
 	tasks, _ := docker.Tasks()
 	networks, _ := docker.Networks()
 	info, _ := docker.Info()
-	cache := getNodeStatsCache()
-	totalCPU := 0.0
-	totalMem := int64(0)
-	resources := map[string]map[string]any{}
-	cpuSum, memSum, diskSum := 0.0, 0.0, 0.0
-	memUsed, diskUsed, diskTotal := int64(0), int64(0), int64(0)
-	nc := 0
-	for _, nd := range nodes {
-		if nd.Status.State != "ready" { continue }
-		cpu := float64(nd.Description.Resources.NanoCPUs) / 1e9
-		mem := nd.Description.Resources.MemoryBytes
-		totalCPU += cpu
-		totalMem += mem
-		resources[nd.ID] = map[string]any{"cores": cpu, "memory": mem}
-		if s, ok := cache[nd.ID]; ok {
-			nc++
-			if c, ok := s["cpu"].(map[string]any); ok {
-				if v, ok := c["usedPercentage"].(float64); ok { cpuSum += v }
-			}
-			if m, ok := s["memory"].(map[string]any); ok {
-				if v, ok := m["usedPercentage"].(float64); ok { memSum += v }
-				if v, ok := m["used"].(float64); ok { memUsed += int64(v) }
-			}
-			if d, ok := s["disk"].(map[string]any); ok {
-				if v, ok := d["usedPercentage"].(float64); ok { diskSum += v }
-				if v, ok := d["used"].(float64); ok { diskUsed += int64(v) }
-				if v, ok := d["total"].(float64); ok { diskTotal += int64(v) }
-			}
-		}
-	}
-	cpuAvg, memAvg, diskAvg := 0.0, 0.0, 0.0
-	if nc > 0 { cpuAvg = cpuSum / float64(nc); memAvg = memSum / float64(nc); diskAvg = diskSum / float64(nc) }
+	nodes, _ := docker.Nodes()
 	return map[string]any{
-		"stats": map[string]any{
-			"resources": resources,
-			"cpu":    map[string]any{"usage": cpuAvg, "cores": totalCPU},
-			"memory": map[string]any{"usage": memAvg, "used": memUsed, "total": totalMem},
-			"disk":   map[string]any{"usage": diskAvg, "used": diskUsed, "total": diskTotal},
-		},
+		"stats":              clusterStats(),
 		"services":           mapServices(services, tasks, networks, info),
 		"nodes":              mapNodes(nodes),
 		"nodes-ts":           limitTimeseries(getHostTimeseries(), 100),
@@ -425,7 +389,15 @@ func Broadcast(event any) {
 }
 
 // EventPush handles agent stats push (POST /events)
+// #101: validates SWARMPIT_AGENT_SECRET when configured
 func EventPush(w http.ResponseWriter, r *http.Request) {
+	if secret := os.Getenv("SWARMPIT_AGENT_SECRET"); secret != "" {
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") || strings.TrimPrefix(auth, "Bearer ") != secret {
+			jsonErr(w, 401, "invalid agent secret")
+			return
+		}
+	}
 	var event map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
 		jsonErr(w, 400, "invalid event data")

@@ -782,3 +782,36 @@ func GetActiveCluster() (string, string) {
 	db.QueryRow("SELECT id, docker_host FROM clusters WHERE is_active = 1").Scan(&id, &host)
 	return id, host
 }
+
+// #106: Stack deactivated replicas — store replica counts before deactivation
+func InitStackReplicas() {
+	db.Exec(`CREATE TABLE IF NOT EXISTS stack_deactivated_replicas (
+		stack_name TEXT NOT NULL, service_id TEXT NOT NULL, replicas INTEGER NOT NULL,
+		PRIMARY KEY(stack_name, service_id)
+	)`)
+}
+
+func SaveDeactivatedReplicas(stackName, serviceID string, replicas uint64) {
+	db.Exec("INSERT OR REPLACE INTO stack_deactivated_replicas (stack_name, service_id, replicas) VALUES (?,?,?)",
+		stackName, serviceID, replicas)
+}
+
+func GetDeactivatedReplicas(stackName string) map[string]uint64 {
+	rows, err := db.Query("SELECT service_id, replicas FROM stack_deactivated_replicas WHERE stack_name = ?", stackName)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	result := map[string]uint64{}
+	for rows.Next() {
+		var svcID string
+		var replicas uint64
+		rows.Scan(&svcID, &replicas)
+		result[svcID] = replicas
+	}
+	return result
+}
+
+func ClearDeactivatedReplicas(stackName string) {
+	db.Exec("DELETE FROM stack_deactivated_replicas WHERE stack_name = ?", stackName)
+}

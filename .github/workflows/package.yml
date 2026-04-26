@@ -2,7 +2,7 @@ name: Package
 
 on:
   push:
-    branches: [master]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Extract version from tag
+        id: version
+        run: echo "tag=${GITHUB_REF_NAME:-latest}" >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -24,4 +27,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:v2.0.0
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.tag }}

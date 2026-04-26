@@ -1,15 +1,20 @@
 package api
 
 import (
+	"bytes"
+	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -121,13 +126,31 @@ func GitWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		json200(w, map[string]string{"status": "disabled"})
 		return
 	}
-	// #74: validate webhook secret if configured
+	// #102: validate webhook secret with real HMAC-SHA256
 	if secret := os.Getenv("SWARMPIT_WEBHOOK_SECRET"); secret != "" {
-		sig := r.Header.Get("X-Hub-Signature-256")
-		if sig == "" {
-			sig = r.Header.Get("X-Gitlab-Token")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			jsonErr(w, 400, "cannot read body")
+			return
 		}
-		if sig == "" {
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		// GitHub: X-Hub-Signature-256 = "sha256=<hex>"
+		if sig := r.Header.Get("X-Hub-Signature-256"); sig != "" {
+			mac := hmac.New(sha256.New, []byte(secret))
+			mac.Write(body)
+			expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+			if !hmac.Equal([]byte(expected), []byte(sig)) {
+				jsonErr(w, 403, "invalid webhook signature")
+				return
+			}
+		} else if token := r.Header.Get("X-Gitlab-Token"); token != "" {
+			// GitLab: X-Gitlab-Token compared directly
+			if token != secret {
+				jsonErr(w, 403, "invalid webhook token")
+				return
+			}
+		} else {
 			jsonErr(w, 401, "webhook signature required")
 			return
 		}
@@ -146,6 +169,13 @@ func repoDir(gs store.GitStack) string {
 	return filepath.Join(gitWorkDir, gs.ID)
 }
 
+// #115: sanitize git error messages to remove embedded credentials
+var credURLPattern = regexp.MustCompile(`https?://[^@]+@`)
+
+func sanitizeGitError(msg string) string {
+	return credURLPattern.ReplaceAllString(msg, "https://***@")
+}
+
 func gitCloneOrPull(gs store.GitStack) error {
 	dir := repoDir(gs)
 	repoURL := injectCredentials(gs.RepoURL, gs.Credentials)
@@ -154,11 +184,11 @@ func gitCloneOrPull(gs store.GitStack) error {
 		// Pull
 		cmd := exec.Command("git", "-C", dir, "fetch", "--depth=1", "origin", gs.Branch)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git fetch: %s", string(out))
+			return fmt.Errorf("git fetch: %s", sanitizeGitError(string(out)))
 		}
 		cmd = exec.Command("git", "-C", dir, "reset", "--hard", "origin/"+gs.Branch)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git reset: %s", string(out))
+			return fmt.Errorf("git reset: %s", sanitizeGitError(string(out)))
 		}
 		return nil
 	}
@@ -168,7 +198,7 @@ func gitCloneOrPull(gs store.GitStack) error {
 	cmd := exec.Command("git", "clone", "--depth=1", "--branch", gs.Branch, "--single-branch", repoURL, dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		os.RemoveAll(dir)
-		return fmt.Errorf("git clone: %s", string(out))
+		return fmt.Errorf("git clone: %s", sanitizeGitError(string(out)))
 	}
 	return nil
 }

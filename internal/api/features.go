@@ -17,7 +17,6 @@ import (
 	"github.com/ccvass/swarmpit-xpx/internal/docker"
 	"github.com/ccvass/swarmpit-xpx/internal/store"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/go-chi/chi/v5"
 
 	"crypto/hmac"
 	"crypto/sha256"
@@ -563,7 +562,7 @@ func extractXMLTags(xml, tag string) []string {
 // ─── Helpers ───
 
 func authUser(r *http.Request) string {
-	if u := chi.URLParam(r, "username"); u != "" {
+	if u := r.Header.Get("X-User"); u != "" {
 		return u
 	}
 	if u, ok := r.Context().Value("username").(string); ok {

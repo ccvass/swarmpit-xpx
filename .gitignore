@@ -79,6 +79,7 @@ dist/
 # Database (local dev)
 *.db
 !/data/
-web-app/node_modules/
+web-app/
+web/
 .playwright-mcp/
 todo.json

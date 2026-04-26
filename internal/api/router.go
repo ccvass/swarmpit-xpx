@@ -6,16 +6,65 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/ccvass/swarmpit-xpx/internal/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/time/rate"
+)
+
+// ipRateLimiter tracks per-IP rate limiters
+type ipRateLimiter struct {
+	mu       sync.Mutex
+	limiters map[string]*rate.Limiter
+	rate     rate.Limit
+	burst    int
+}
+
+func newIPRateLimiter(r rate.Limit, b int) *ipRateLimiter {
+	return &ipRateLimiter{limiters: make(map[string]*rate.Limiter), rate: r, burst: b}
+}
+
+func (i *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if lim, ok := i.limiters[ip]; ok {
+		return lim
+	}
+	lim := rate.NewLimiter(i.rate, i.burst)
+	i.limiters[ip] = lim
+	return lim
+}
+
+func rateLimitMiddleware(lim *ipRateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := r.RemoteAddr
+			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+				ip = strings.SplitN(fwd, ",", 2)[0]
+			}
+			if !lim.getLimiter(strings.TrimSpace(ip)).Allow() {
+				w.Header().Set("Retry-After", "60")
+				http.Error(w, `{"error":"too many requests"}`, http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+var (
+	// 100 req/min general, 5 req/min for login
+	apiLimiter   = newIPRateLimiter(rate.Limit(100.0/60.0), 10)
+	loginLimiter = newIPRateLimiter(rate.Limit(5.0/60.0), 5)
 )
 
 func NewRouter(staticFS fs.FS) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
+	r.Use(rateLimitMiddleware(apiLimiter))
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("X-Backend-Server", "swarmpit")
@@ -43,7 +92,7 @@ func NewRouter(staticFS fs.FS) http.Handler {
 	r.Get("/health/ready", HealthReady)
 	r.Get("/api-docs", SwaggerUI)
 	r.Get("/api-docs/swagger.json", SwaggerJSON)
-	r.Post("/login", Login)
+	r.Post("/login", rateLimitMiddleware(loginLimiter)(http.HandlerFunc(Login)).ServeHTTP)
 	r.Post("/initialize", Initialize)
 	r.Get("/oauth/{provider}/login", OAuthLogin)
 	r.Get("/oauth/{provider}/callback", OAuthCallback)
@@ -124,14 +173,14 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Get("/api/stacks/{name}/compose", StackCompose)
 		r.Post("/api/stacks/git", auth.WriteOnly(http.HandlerFunc(GitDeploy)).ServeHTTP)
 		r.Post("/api/stacks", auth.WriteOnly(http.HandlerFunc(StackCreate)).ServeHTTP)
-		r.Put("/api/stacks/{name}", auth.WriteOnly(http.HandlerFunc(StackUpdate)).ServeHTTP)
-		r.Delete("/api/stacks/{name}", auth.WriteOnly(http.HandlerFunc(StackDelete)).ServeHTTP)
-		r.Post("/api/stacks/{name}/redeploy", auth.WriteOnly(http.HandlerFunc(StackRedeploy)).ServeHTTP)
-		r.Post("/api/stacks/{name}/rollback", auth.WriteOnly(http.HandlerFunc(StackRollback)).ServeHTTP)
+		r.Put("/api/stacks/{name}", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackUpdate))).ServeHTTP)
+		r.Delete("/api/stacks/{name}", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackDelete))).ServeHTTP)
+		r.Post("/api/stacks/{name}/redeploy", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackRedeploy))).ServeHTTP)
+		r.Post("/api/stacks/{name}/rollback", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackRollback))).ServeHTTP)
 		r.Post("/api/services/{id}/stop", auth.WriteOnly(http.HandlerFunc(ServiceStop)).ServeHTTP)
 		r.Put("/api/nodes/{id}", auth.WriteOnly(http.HandlerFunc(NodeEdit)).ServeHTTP)
-		r.Post("/api/stacks/{name}/activate", auth.WriteOnly(http.HandlerFunc(StackActivate)).ServeHTTP)
-		r.Post("/api/stacks/{name}/deactivate", auth.WriteOnly(http.HandlerFunc(StackDeactivate)).ServeHTTP)
+		r.Post("/api/stacks/{name}/activate", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackActivate))).ServeHTTP)
+		r.Post("/api/stacks/{name}/deactivate", auth.WriteOnly(auth.TeamPermissionCheck(http.HandlerFunc(StackDeactivate))).ServeHTTP)
 		r.Get("/api/me", Me)
 		r.Post("/api/password", PasswordChange)
 		r.Get("/api/webhooks", WebhookList)
