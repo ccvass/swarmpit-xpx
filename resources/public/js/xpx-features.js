@@ -206,11 +206,10 @@ function doPrune(dry){
   var el=document.getElementById('pr-result');el.innerHTML='<em>Working...</em>';
   api('POST','/api/system/prune',{images:document.getElementById('pr-img').checked,volumes:document.getElementById('pr-vol').checked,networks:document.getElementById('pr-net').checked,dryRun:dry})
     .then(function(data){
-      var lines=[];
-      if(data.images)lines.push('Images: '+data.images.length+' removed');
-      if(data.volumes)lines.push('Volumes: '+data.volumes.length+' removed');
-      if(data.networks)lines.push('Networks: '+data.networks.length+' removed');
-      if(data.spaceReclaimed)lines.push('Space reclaimed: '+data.spaceReclaimed);
+      var label=dry?'Preview:':'Done:';var lines=[];
+      if(data.images)lines.push('Images: '+data.images.count+' removed'+(data.images.spaceReclaimed?' ('+(data.images.spaceReclaimed/1048576).toFixed(1)+' MB)':''));
+      if(data.volumes)lines.push('Volumes: '+data.volumes.count+' removed'+(data.volumes.spaceReclaimed?' ('+(data.volumes.spaceReclaimed/1048576).toFixed(1)+' MB)':''));
+      if(data.networks)lines.push('Networks: '+data.networks.count+' removed');
       el.innerHTML=(dry?'<strong>Preview:</strong><br>':'<strong>Done:</strong><br>')+lines.join('<br>');
     }).catch(function(e){el.innerHTML='<p style="color:red">Error: '+e+'</p>';});
 }
