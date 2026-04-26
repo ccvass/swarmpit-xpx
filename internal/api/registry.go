@@ -53,13 +53,47 @@ func fetchAuthenticatedTags(host, repo string) ([]map[string]any, error) {
 			return doTagsRequest(req)
 		}
 	}
-	// Generic v2 with basic auth
+	// Generic v2 with basic auth, fallback to token auth via WWW-Authenticate
 	u := fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo)
 	req, _ := http.NewRequest("GET", u, nil)
 	if username != "" && password != "" {
 		req.SetBasicAuth(username, password)
 	}
-	return doTagsRequest(req)
+	tags, err := doTagsRequest(req)
+	if err != nil && username != "" && password != "" {
+		// Basic auth failed — try token-based auth by probing /v2/ for WWW-Authenticate
+		probeReq, _ := http.NewRequest("GET", fmt.Sprintf("https://%s/v2/", host), nil)
+		probeResp, probeErr := httpClient.Do(probeReq)
+		if probeErr == nil {
+			probeResp.Body.Close()
+			wwwAuth := probeResp.Header.Get("Www-Authenticate")
+			if strings.Contains(wwwAuth, "Bearer") {
+				realm, service := parseWWWAuthenticate(wwwAuth)
+				if realm != "" {
+					authURL := fmt.Sprintf("%s?service=%s&scope=repository:%s:pull", realm, service, repo)
+					return fetchTagsWithBearer(authURL, u, username, password)
+				}
+			}
+		}
+	}
+	return tags, err
+}
+
+func parseWWWAuthenticate(header string) (realm, service string) {
+	// Parse: Bearer realm="https://...",service="..."
+	for _, part := range strings.Split(header, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "Bearer ") {
+			part = strings.TrimPrefix(part, "Bearer ")
+		}
+		if strings.HasPrefix(part, "realm=") {
+			realm = strings.Trim(strings.TrimPrefix(part, "realm="), "\"")
+		}
+		if strings.HasPrefix(part, "service=") {
+			service = strings.Trim(strings.TrimPrefix(part, "service="), "\"")
+		}
+	}
+	return
 }
 
 // fetchTagsWithBearer gets a bearer token then fetches tags
