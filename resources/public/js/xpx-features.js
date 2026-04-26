@@ -70,19 +70,19 @@
     return fetch(path, opts).then(function (r) { return r.json(); });
   }
 
-  /* ── Sidebar: inject items matching native Swarmpit style ── */
+  /* ── Sidebar: inject items into main nav list ── */
   function injectSidebar() {
     if (document.getElementById('xpx-tools')) return;
     var nav = document.querySelector('nav');
     if (!nav) return;
-    var hr = nav.querySelector('hr');
-    if (!hr) return;
-    var parent = hr.parentNode;
+    // Find the main nav list (second child of Swarmpit-drawer-content)
+    var content = nav.querySelector('.Swarmpit-drawer-content');
+    if (!content || content.children.length < 2) return;
+    var navList = content.children[1]; // the MuiBox with Dashboard, Registries, etc.
 
     var wrapper = document.createElement('div');
     wrapper.id = 'xpx-tools';
 
-    // Label matching APPLICATIONS / INFRASTRUCTURE / DATA style
     var label = document.createElement('li');
     label.className = 'MuiListSubheader-root';
     label.style.cssText = 'list-style:none;padding:12px 16px 4px;color:rgba(255,255,255,0.5);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08333em;line-height:48px;font-weight:500;font-family:Roboto,sans-serif;';
@@ -102,12 +102,10 @@
       a.onmouseenter = function () { a.style.background = 'rgba(255,255,255,0.08)'; };
       a.onmouseleave = function () { a.style.background = 'none'; };
       a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
-      // Icon placeholder (same width as Swarmpit icons)
       var icon = document.createElement('div');
       icon.style.cssText = 'min-width:40px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);';
       icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/></svg>';
       a.appendChild(icon);
-      // Text
       var txt = document.createElement('h6');
       txt.className = 'MuiTypography-root MuiTypography-h6';
       txt.style.cssText = 'font-size:0.875rem;font-weight:400;line-height:1.5;color:inherit;margin:0;';
@@ -116,7 +114,7 @@
       wrapper.appendChild(a);
     });
 
-    parent.insertBefore(wrapper, hr);
+    navList.appendChild(wrapper);
   }
 
   /* ── Page rendering in main area ── */
