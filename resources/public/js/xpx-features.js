@@ -70,10 +70,53 @@
     return fetch(path, opts).then(function (r) { return r.json(); });
   }
 
-  /* ── Sidebar: activate fixed HTML nav when logged in ── */
-  function activateNav() {
-    var nav = document.getElementById('xpx-tools-nav');
-    if (nav) nav.classList.add('active');
+  /* ── Sidebar: inject items matching native Swarmpit style ── */
+  function injectSidebar() {
+    if (document.getElementById('xpx-tools')) return;
+    var nav = document.querySelector('nav');
+    if (!nav) return;
+    var hr = nav.querySelector('hr');
+    if (!hr) return;
+    var parent = hr.parentNode;
+
+    var wrapper = document.createElement('div');
+    wrapper.id = 'xpx-tools';
+
+    // Label matching APPLICATIONS / INFRASTRUCTURE / DATA style
+    var label = document.createElement('li');
+    label.className = 'MuiListSubheader-root';
+    label.style.cssText = 'list-style:none;padding:12px 16px 4px;color:rgba(255,255,255,0.5);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08333em;line-height:48px;font-weight:500;font-family:Roboto,sans-serif;';
+    label.textContent = 'Tools';
+    wrapper.appendChild(label);
+
+    var items = [
+      { name: 'GitOps', hash: '/xpx/gitops' },
+      { name: 'Image Updates', hash: '/xpx/updates' },
+      { name: 'System Prune', hash: '/xpx/prune' }
+    ];
+    items.forEach(function (item) {
+      var a = document.createElement('a');
+      a.href = '#' + item.hash;
+      a.className = 'MuiButtonBase-root MuiListItem-root MuiListItem-gutters MuiListItem-button';
+      a.style.cssText = 'display:flex;align-items:center;padding:4px 16px;color:rgba(255,255,255,0.7);text-decoration:none;font:400 14px/1.5 Roboto,sans-serif;cursor:pointer;transition:background 0.15s;width:100%;box-sizing:border-box;';
+      a.onmouseenter = function () { a.style.background = 'rgba(255,255,255,0.08)'; };
+      a.onmouseleave = function () { a.style.background = 'none'; };
+      a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
+      // Icon placeholder (same width as Swarmpit icons)
+      var icon = document.createElement('div');
+      icon.style.cssText = 'min-width:40px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);';
+      icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/></svg>';
+      a.appendChild(icon);
+      // Text
+      var txt = document.createElement('h6');
+      txt.className = 'MuiTypography-root MuiTypography-h6';
+      txt.style.cssText = 'font-size:0.875rem;font-weight:400;line-height:1.5;color:inherit;margin:0;';
+      txt.textContent = item.name;
+      a.appendChild(txt);
+      wrapper.appendChild(a);
+    });
+
+    parent.insertBefore(wrapper, hr);
   }
 
   /* ── Page rendering in main area ── */
@@ -184,11 +227,18 @@
 
   /* ── Init ── */
   window.addEventListener('hashchange', function () { setTimeout(renderPage, 300); });
-  var initInterval = setInterval(function () {
+  // Persistent interval: re-inject sidebar if ClojureScript removes it
+  setInterval(function () {
     getToken();
     if (!TOKEN) return;
-    activateNav();
+    injectSidebar();
+  }, 2000);
+  // Also try immediately and on short intervals at startup
+  var fastInit = setInterval(function () {
+    getToken();
+    if (!TOKEN) return;
+    injectSidebar();
     renderPage();
-    clearInterval(initInterval);
-  }, 500);
+    if (document.getElementById('xpx-tools')) clearInterval(fastInit);
+  }, 300);
 })();
