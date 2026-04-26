@@ -1584,8 +1584,12 @@ func redactRegistryCreds(reg map[string]any) map[string]any {
 func RegistryList(w http.ResponseWriter, r *http.Request) {
 	regType := chi.URLParam(r, "type")
 	regs, _ := store.ListRegistries(regType)
+	owner := r.Header.Get("X-User")
+	if owner == "" { owner = "admin" }
 	for i := range regs {
 		regs[i] = redactRegistryCreds(regs[i])
+		regs[i]["owner"] = owner
+		regs[i]["_id"] = regs[i]["id"]
 	}
 	json200(w, regs)
 }
