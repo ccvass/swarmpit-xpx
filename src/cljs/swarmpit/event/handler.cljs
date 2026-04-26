@@ -23,4 +23,4 @@
 
 (defmethod handle :default
   [_ event]
-  (state/set-value event state/form-value-cursor))
+  nil)
