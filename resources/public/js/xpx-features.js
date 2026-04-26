@@ -84,9 +84,9 @@
     wrapper.id = 'xpx-tools';
 
     var label = document.createElement('li');
-    label.className = 'MuiListSubheader-root';
-    label.style.cssText = 'list-style:none;padding:12px 16px 4px;color:rgba(255,255,255,0.5);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08333em;line-height:48px;font-weight:500;font-family:Roboto,sans-serif;';
-    label.textContent = 'Tools';
+    label.className = 'MuiListItem-root Swarmpit-drawer-category';
+    label.style.cssText = 'list-style:none;';
+    label.textContent = 'TOOLS';
     wrapper.appendChild(label);
 
     var items = [
@@ -97,18 +97,14 @@
     items.forEach(function (item) {
       var a = document.createElement('a');
       a.href = '#' + item.hash;
-      a.className = 'MuiButtonBase-root MuiListItem-root MuiListItem-gutters MuiListItem-button';
-      a.style.cssText = 'display:flex;align-items:center;padding:4px 16px;color:rgba(255,255,255,0.7) !important;text-decoration:none;font:400 14px/1.5 Roboto,sans-serif;cursor:pointer;transition:background 0.15s;width:100%;box-sizing:border-box;';
-      a.onmouseenter = function () { a.style.background = 'rgba(255,255,255,0.08)'; a.style.color = '#fff'; };
-      a.onmouseleave = function () { a.style.background = 'none'; a.style.color = 'rgba(255,255,255,0.7)'; };
+      a.className = 'MuiButtonBase-root MuiListItem-root Swarmpit-drawer-item MuiListItem-gutters MuiListItem-button';
       a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
       var icon = document.createElement('div');
-      icon.style.cssText = 'min-width:40px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);';
-      icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/></svg>';
+      icon.className = 'MuiListItemIcon-root Swarmpit-drawer-icon';
+      icon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>';
       a.appendChild(icon);
-      var txt = document.createElement('h6');
-      txt.className = 'MuiTypography-root MuiTypography-h6';
-      txt.style.cssText = 'font-size:0.875rem;font-weight:400;line-height:1.5;color:rgba(255,255,255,0.7) !important;margin:0;';
+      var txt = document.createElement('span');
+      txt.className = 'MuiTypography-root Swarmpit-drawer-text MuiTypography-body1';
       txt.textContent = item.name;
       a.appendChild(txt);
       wrapper.appendChild(a);
