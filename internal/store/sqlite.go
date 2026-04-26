@@ -29,7 +29,7 @@ func Init(dbPath string) error {
 		CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL,
 			password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin',
-			email TEXT, api_token TEXT
+			email TEXT, api_token TEXT, totp_secret TEXT
 		);
 		CREATE TABLE IF NOT EXISTS secret (id TEXT PRIMARY KEY, secret TEXT NOT NULL);
 		CREATE TABLE IF NOT EXISTS webhooks (
@@ -673,4 +673,112 @@ func DeleteGitStack(id string) error {
 func boolToInt(b bool) int {
 	if b { return 1 }
 	return 0
+}
+
+// #93: TOTP secret management
+func SetTOTPSecret(username, secret string) error {
+	_, err := db.Exec("UPDATE users SET totp_secret = ? WHERE username = ?", secret, username)
+	return err
+}
+
+func GetTOTPSecret(username string) string {
+	var s sql.NullString
+	db.QueryRow("SELECT totp_secret FROM users WHERE username = ?", username).Scan(&s)
+	return s.String
+}
+
+func ClearTOTPSecret(username string) error {
+	_, err := db.Exec("UPDATE users SET totp_secret = NULL WHERE username = ?", username)
+	return err
+}
+
+// #99: Team permissions
+func InitTeamPermissions() {
+	db.Exec(`CREATE TABLE IF NOT EXISTS team_permissions (
+		id TEXT PRIMARY KEY, team_name TEXT NOT NULL,
+		username TEXT NOT NULL, stack_pattern TEXT NOT NULL DEFAULT '*',
+		role TEXT NOT NULL DEFAULT 'user',
+		UNIQUE(team_name, username)
+	)`)
+}
+
+func ListTeamPermissions() []map[string]any {
+	rows, err := db.Query("SELECT id, team_name, username, stack_pattern, role FROM team_permissions")
+	if err != nil { return []map[string]any{} }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, team, user, pattern, role string
+		rows.Scan(&id, &team, &user, &pattern, &role)
+		result = append(result, map[string]any{"id": id, "teamName": team, "username": user, "stackPattern": pattern, "role": role})
+	}
+	if result == nil { result = []map[string]any{} }
+	return result
+}
+
+func CreateTeamPermission(team, username, stackPattern, role string) (string, error) {
+	id := uuid.NewString()
+	_, err := db.Exec("INSERT INTO team_permissions (id, team_name, username, stack_pattern, role) VALUES (?,?,?,?,?)",
+		id, team, username, stackPattern, role)
+	return id, err
+}
+
+func DeleteTeamPermission(id string) error {
+	_, err := db.Exec("DELETE FROM team_permissions WHERE id = ?", id)
+	return err
+}
+
+func UserStackAccess(username, stackName string) bool {
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM team_permissions WHERE username = ? AND (stack_pattern = '*' OR stack_pattern = ?)", username, stackName).Scan(&count)
+	return count > 0
+}
+
+// #100: Multi-cluster registry
+func InitClusters() {
+	db.Exec(`CREATE TABLE IF NOT EXISTS clusters (
+		id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL,
+		docker_host TEXT NOT NULL, tls_ca TEXT, tls_cert TEXT, tls_key TEXT,
+		is_active INTEGER DEFAULT 0
+	)`)
+}
+
+func ListClusters() []map[string]any {
+	rows, err := db.Query("SELECT id, name, docker_host, is_active FROM clusters")
+	if err != nil { return []map[string]any{} }
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var id, name, host string
+		var active int
+		rows.Scan(&id, &name, &host, &active)
+		result = append(result, map[string]any{"id": id, "name": name, "dockerHost": host, "isActive": active == 1})
+	}
+	if result == nil { result = []map[string]any{} }
+	return result
+}
+
+func CreateCluster(name, dockerHost, tlsCa, tlsCert, tlsKey string) (string, error) {
+	id := uuid.NewString()
+	_, err := db.Exec("INSERT INTO clusters (id, name, docker_host, tls_ca, tls_cert, tls_key) VALUES (?,?,?,?,?,?)",
+		id, name, dockerHost, tlsCa, tlsCert, tlsKey)
+	return id, err
+}
+
+func DeleteCluster(id string) error {
+	_, err := db.Exec("DELETE FROM clusters WHERE id = ?", id)
+	return err
+}
+
+func SetActiveCluster(id string) error {
+	tx, _ := db.Begin()
+	tx.Exec("UPDATE clusters SET is_active = 0")
+	tx.Exec("UPDATE clusters SET is_active = 1 WHERE id = ?", id)
+	return tx.Commit()
+}
+
+func GetActiveCluster() (string, string) {
+	var id, host string
+	db.QueryRow("SELECT id, docker_host FROM clusters WHERE is_active = 1").Scan(&id, &host)
+	return id, host
 }

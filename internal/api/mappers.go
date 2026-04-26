@@ -896,5 +896,37 @@ func mapStack(name string, services []swarm.Service, tasks []swarm.Task, network
 	return map[string]any{
 		"stackName": name, "state": state, "services": stackSvcs,
 		"networks": stackNets, "volumes": stackVols, "configs": stackCfgs, "secrets": stackSecs,
+		"createdAt": stackCreatedAt(stackSvcs), "updatedAt": stackUpdatedAt(stackSvcs),
 	}
+}
+
+// #90: derive stack timestamps from services
+func stackCreatedAt(svcs []map[string]any) any {
+	var earliest string
+	for _, s := range svcs {
+		if t, ok := s["createdAt"].(string); ok && t != "" {
+			if earliest == "" || t < earliest {
+				earliest = t
+			}
+		}
+	}
+	if earliest == "" {
+		return nil
+	}
+	return earliest
+}
+
+func stackUpdatedAt(svcs []map[string]any) any {
+	var latest string
+	for _, s := range svcs {
+		if t, ok := s["updatedAt"].(string); ok && t != "" {
+			if latest == "" || t > latest {
+				latest = t
+			}
+		}
+	}
+	if latest == "" {
+		return nil
+	}
+	return latest
 }

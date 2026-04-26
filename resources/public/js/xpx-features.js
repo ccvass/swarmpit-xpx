@@ -186,7 +186,64 @@
   /* ── Init: wait for login then show button ── */
   var initInterval = setInterval(function () {
     getToken();
-    if (TOKEN) { createToolsButton(); clearInterval(initInterval); initComposeAutoFill(); }
+    if (TOKEN) { createToolsButton(); clearInterval(initInterval); initComposeAutoFill(); initAnsiLogs(); fixPiechart(); initUpdateOrderToggle(); }
   }, 1000);
-  window.addEventListener('hashchange', function () { getToken(); if (TOKEN) initComposeAutoFill(); });
+  window.addEventListener('hashchange', function () { getToken(); if (TOKEN) { initComposeAutoFill(); initAnsiLogs(); fixPiechart(); initUpdateOrderToggle(); } });
+
+  /* #91: ANSI color rendering in log viewer */
+  var ANSI_COLORS = {'30':'#000','31':'#e53935','32':'#43a047','33':'#fb8c00','34':'#1e88e5','35':'#8e24aa','36':'#00acc1','37':'#eee','90':'#757575','91':'#ef5350','92':'#66bb6a','93':'#ffa726','94':'#42a5f5','95':'#ab47bc','96':'#26c6da','97':'#fff'};
+  function ansiToHTML(text) {
+    return text.replace(/\x1b\[([0-9;]+)m/g, function(_, codes) {
+      var parts = codes.split(';');
+      for (var i = 0; i < parts.length; i++) {
+        if (ANSI_COLORS[parts[i]]) return '<span style="color:' + ANSI_COLORS[parts[i]] + '">';
+        if (parts[i] === '0' || parts[i] === '') return '</span>';
+        if (parts[i] === '1') return '<span style="font-weight:bold">';
+      }
+      return '';
+    });
+  }
+  function initAnsiLogs() {
+    var observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(m) {
+        m.addedNodes.forEach(function(node) {
+          if (node.nodeType === 1 && node.classList && node.classList.contains('log-content')) {
+            var raw = node.textContent;
+            if (raw.indexOf('\x1b[') !== -1) {
+              node.innerHTML = ansiToHTML(raw.replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+            }
+          }
+        });
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  /* #95: Fix piechart SVG with high replica counts */
+  function fixPiechart() {
+    var style = document.getElementById('xpx-piechart-fix');
+    if (style) return;
+    style = document.createElement('style');
+    style.id = 'xpx-piechart-fix';
+    style.textContent = '.piechart-container svg { max-width: 100%; height: auto; overflow: visible; } .piechart-container svg circle { vector-effect: non-scaling-stroke; }';
+    document.head.appendChild(style);
+  }
+
+  /* #96: Update order toggle on service edit */
+  function initUpdateOrderToggle() {
+    if (window.location.hash.indexOf('/edit') === -1) return;
+    var attempts = 0;
+    var iv = setInterval(function() {
+      if (++attempts > 20) { clearInterval(iv); return; }
+      var form = document.querySelector('[class*="deployment"]') || document.querySelector('[class*="update-config"]');
+      if (!form) return;
+      if (document.getElementById('xpx-update-order')) { clearInterval(iv); return; }
+      clearInterval(iv);
+      var toggle = document.createElement('div');
+      toggle.id = 'xpx-update-order';
+      toggle.style.cssText = 'margin:8px 0;padding:8px;background:#f5f5f5;border-radius:4px;font-size:13px;';
+      toggle.innerHTML = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="xpx-start-first"> <span>Start new tasks before stopping old (start-first)</span></label>';
+      form.parentNode.insertBefore(toggle, form.nextSibling);
+    }, 500);
+  }
 })();

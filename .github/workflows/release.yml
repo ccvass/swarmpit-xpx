@@ -129,11 +129,25 @@ jobs:
     needs: [docker, go-docker]
     permissions:
       contents: write
+      security-events: write
     steps:
       - name: checkout tag
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref_name }}
+      - name: Trivy scan Go image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/ccvass/swarmpit-xpx:go
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+        continue-on-error: true
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
       - uses: actions/download-artifact@v4
         name: download release jar
         with:

@@ -167,6 +167,10 @@ func NewRouter(staticFS fs.FS) http.Handler {
 		r.Delete("/api/gitops/{id}", GitStackDelete)
 		r.Post("/api/gitops/{id}/sync", GitStackSync)
 
+		// #93: TOTP
+		r.Post("/api/totp/setup", TOTPSetup)
+		r.Post("/api/totp/disable", TOTPDisable)
+
 		r.Group(func(r chi.Router) {
 			r.Use(auth.AdminOnly)
 			r.Get("/api/audit", AuditList)
@@ -182,10 +186,21 @@ func NewRouter(staticFS fs.FS) http.Handler {
 			r.Post("/api/backup/s3", BackupToS3)
 			r.Get("/api/backup/s3", ListS3Backups)
 			r.Post("/api/restore/s3", RestoreFromS3)
+			// #89: Bulk stack import
+			r.Post("/api/stacks/import", StackImport)
+			// #99: Team permissions
+			r.Get("/api/teams", TeamPermissionList)
+			r.Post("/api/teams", TeamPermissionCreate)
+			r.Delete("/api/teams/{id}", TeamPermissionDelete)
+			// #100: Multi-cluster
+			r.Get("/api/clusters", ClusterList)
+			r.Post("/api/clusters", ClusterCreate)
+			r.Delete("/api/clusters/{id}", ClusterDelete)
+			r.Post("/api/clusters/{id}/activate", ClusterActivate)
 		})
 	})
 
-	// Static files + SPA fallback
+	// Static files + SPA fallback (#97: serve index for unknown paths)
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path[1:]
 		if path == "" {

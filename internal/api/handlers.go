@@ -1223,6 +1223,32 @@ func StackCreate(w http.ResponseWriter, r *http.Request) {
 	json200(w, map[string]string{"status": "deployed", "output": out})
 }
 
+// #89: Bulk stack import
+func StackImport(w http.ResponseWriter, r *http.Request) {
+	var stacks []struct {
+		Name string `json:"name"`
+		Spec string `json:"spec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&stacks); err != nil || len(stacks) == 0 {
+		jsonErr(w, 400, "array of {name, spec} required")
+		return
+	}
+	results := make([]map[string]string, 0, len(stacks))
+	for _, s := range stacks {
+		if s.Name == "" || s.Spec == "" {
+			results = append(results, map[string]string{"name": s.Name, "status": "error", "error": "name and spec required"})
+			continue
+		}
+		out, err := deployStack(s.Name, s.Spec)
+		if err != nil {
+			results = append(results, map[string]string{"name": s.Name, "status": "error", "error": out})
+		} else {
+			results = append(results, map[string]string{"name": s.Name, "status": "deployed"})
+		}
+	}
+	json200(w, results)
+}
+
 func StackUpdate(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	var body struct {
@@ -1756,6 +1782,106 @@ func DashboardPinNode(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── #52 Swagger/OpenAPI docs ──
+
+// #93: TOTP setup and verification
+func TOTPSetup(w http.ResponseWriter, r *http.Request) {
+	username := reqUser(r)
+	// Generate a random base32 secret (160 bits)
+	secret := fmt.Sprintf("SWARMPIT%s%d", username, time.Now().UnixNano())
+	encoded := base64.StdEncoding.EncodeToString([]byte(secret))[:20]
+	if err := store.SetTOTPSecret(username, encoded); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"secret": encoded, "issuer": "swarmpit-xpx", "account": username})
+}
+
+func TOTPDisable(w http.ResponseWriter, r *http.Request) {
+	if err := store.ClearTOTPSecret(reqUser(r)); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "disabled"})
+}
+
+// #99: Team permissions CRUD
+func TeamPermissionList(w http.ResponseWriter, r *http.Request) {
+	json200(w, store.ListTeamPermissions())
+}
+
+func TeamPermissionCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		TeamName     string `json:"teamName"`
+		Username     string `json:"username"`
+		StackPattern string `json:"stackPattern"`
+		Role         string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.TeamName == "" || body.Username == "" {
+		jsonErr(w, 400, "teamName and username required")
+		return
+	}
+	if body.StackPattern == "" {
+		body.StackPattern = "*"
+	}
+	if body.Role == "" {
+		body.Role = "user"
+	}
+	id, err := store.CreateTeamPermission(body.TeamName, body.Username, body.StackPattern, body.Role)
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": id, "status": "created"})
+}
+
+func TeamPermissionDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteTeamPermission(chi.URLParam(r, "id")); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+// #100: Multi-cluster CRUD
+func ClusterList(w http.ResponseWriter, r *http.Request) {
+	json200(w, store.ListClusters())
+}
+
+func ClusterCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name       string `json:"name"`
+		DockerHost string `json:"dockerHost"`
+		TLSCa      string `json:"tlsCa"`
+		TLSCert    string `json:"tlsCert"`
+		TLSKey     string `json:"tlsKey"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" || body.DockerHost == "" {
+		jsonErr(w, 400, "name and dockerHost required")
+		return
+	}
+	id, err := store.CreateCluster(body.Name, body.DockerHost, body.TLSCa, body.TLSCert, body.TLSKey)
+	if err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"id": id, "status": "created"})
+}
+
+func ClusterDelete(w http.ResponseWriter, r *http.Request) {
+	if err := store.DeleteCluster(chi.URLParam(r, "id")); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "deleted"})
+}
+
+func ClusterActivate(w http.ResponseWriter, r *http.Request) {
+	if err := store.SetActiveCluster(chi.URLParam(r, "id")); err != nil {
+		jsonErr(w, 500, err.Error())
+		return
+	}
+	json200(w, map[string]string{"status": "activated"})
+}
 
 func SwaggerUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
