@@ -70,36 +70,10 @@
     return fetch(path, opts).then(function (r) { return r.json(); });
   }
 
-  /* ── Sidebar items ── */
-  var ITEMS = [
-    { name: 'GitOps', hash: '/xpx/gitops' },
-    { name: 'Image Updates', hash: '/xpx/updates' },
-    { name: 'System Prune', hash: '/xpx/prune' }
-  ];
-
-  function injectSidebar() {
-    var nav = document.querySelector('nav');
-    if (!nav || document.getElementById('xpx-sidebar')) return;
-    var sep = nav.querySelector('hr');
-    if (!sep) return;
-    var container = sep.parentNode;
-    var wrapper = document.createElement('div');
-    wrapper.id = 'xpx-sidebar';
-    var label = document.createElement('li');
-    label.style.cssText = 'list-style:none;padding:12px 16px 4px;color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:500;';
-    label.textContent = 'Tools';
-    wrapper.appendChild(label);
-    ITEMS.forEach(function (item) {
-      var a = document.createElement('a');
-      a.href = '#' + item.hash;
-      a.style.cssText = 'display:flex;align-items:center;padding:8px 16px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;cursor:pointer;transition:all 0.15s;';
-      a.textContent = item.name;
-      a.onmouseenter = function () { a.style.color = '#fff'; a.style.background = 'rgba(255,255,255,0.08)'; };
-      a.onmouseleave = function () { a.style.color = 'rgba(255,255,255,0.7)'; a.style.background = 'none'; };
-      a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
-      wrapper.appendChild(a);
-    });
-    container.insertBefore(wrapper, sep);
+  /* ── Sidebar: activate fixed HTML nav when logged in ── */
+  function activateNav() {
+    var nav = document.getElementById('xpx-tools-nav');
+    if (nav) nav.classList.add('active');
   }
 
   /* ── Page rendering in main area ── */
@@ -209,17 +183,12 @@
   }
 
   /* ── Init ── */
-  window.addEventListener('hashchange', function () { setTimeout(function () { injectSidebar(); renderPage(); }, 300); });
+  window.addEventListener('hashchange', function () { setTimeout(renderPage, 300); });
   var initInterval = setInterval(function () {
     getToken();
     if (!TOKEN) return;
-    var nav = document.querySelector('nav');
-    if (!nav || !nav.querySelector('hr')) return;
-    injectSidebar();
+    activateNav();
     renderPage();
-    // MutationObserver to re-inject when ClojureScript re-renders nav
-    var observer = new MutationObserver(function () { if (!document.getElementById('xpx-sidebar')) injectSidebar(); });
-    observer.observe(nav, { childList: true, subtree: true });
     clearInterval(initInterval);
   }, 500);
 })();

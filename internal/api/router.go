@@ -82,8 +82,16 @@ func NewRouter(staticFS fs.FS) http.Handler {
 
 	// Read index.html and inject CSS/JS tags
 	rawIndex, _ := fs.ReadFile(staticFS, "index.html")
-	idx := strings.Replace(string(rawIndex), "</head>", `<link rel="stylesheet" href="/css/main.css?v=2.12.2"><script src="/js/xpx-features.js?v=2.12.13"></script></head>`, 1)
-	idx = strings.Replace(idx, "</body>", `<script src="/js/main.js?v=2.12.3"></script></body>`, 1)
+	idx := strings.Replace(string(rawIndex), "</head>", `<link rel="stylesheet" href="/css/main.css?v=2.12.2"><script src="/js/xpx-features.js?v=2.12.14"></script>
+<style>
+#xpx-tools-nav{display:none;position:fixed;left:0;bottom:0;width:240px;z-index:1200;padding:0 0 12px;background:linear-gradient(to top,rgba(21,101,192,0.97),transparent);pointer-events:none}
+#xpx-tools-nav.active{display:block}
+#xpx-tools-nav a{display:block;padding:8px 24px;color:rgba(255,255,255,0.8);text-decoration:none;font:14px/1.4 Roboto,sans-serif;pointer-events:auto;transition:color 0.15s}
+#xpx-tools-nav a:hover{color:#fff}
+#xpx-tools-nav .xpx-label{padding:8px 24px 4px;color:rgba(255,255,255,0.5);font:500 11px/1 Roboto,sans-serif;text-transform:uppercase;letter-spacing:1px}
+</style>
+</head>`, 1)
+	idx = strings.Replace(idx, "</body>", `<div id="xpx-tools-nav"><div class="xpx-label">Tools</div><a href="#/xpx/gitops">GitOps</a><a href="#/xpx/updates">Image Updates</a><a href="#/xpx/prune">System Prune</a></div><script src="/js/main.js?v=2.12.3"></script></body>`, 1)
 	indexHTML := []byte(idx)
 
 	// Public
