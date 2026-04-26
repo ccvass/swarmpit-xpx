@@ -54,263 +54,272 @@
     }
   }, 50);
 })();
-(function () {
-  'use strict';
 
-  /* ── Helpers ── */
-  function getToken() {
-    try { var r = localStorage.getItem('token') || sessionStorage.getItem('token'); return r ? r.replace(/^"|"$/g, '') : ''; } catch(e) { return ''; }
-  }
-  function api(method, path, body) {
-    var t = getToken(), opts = { method: method, headers: { 'Authorization': t, 'Content-Type': 'application/json' } };
-    if (body) opts.body = JSON.stringify(body);
-    return fetch(path, opts).then(function(r) { return r.ok ? r.json() : r.json().then(function(e) { throw e; }); });
-  }
-  function heading(t) { return '<h5 style="margin:0 0 20px;font-weight:400;font-size:1.25rem;color:rgba(0,0,0,.87)">' + t + '</h5>'; }
-  function btn(id, label, color) {
-    return '<button id="' + id + '" style="padding:6px 16px;background:' + (color || '#1976d2') + ';color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.875rem;font-weight:500;margin-right:8px;letter-spacing:.02em;line-height:1.75;text-transform:uppercase">' + label + '</button>';
-  }
-  function tbl(heads, rows) {
-    var h = '<table style="width:100%;border-collapse:collapse;font-size:.875rem"><thead><tr style="border-bottom:2px solid #e0e0e0">';
-    heads.forEach(function(t) { h += '<th style="padding:8px 12px;text-align:left;font-weight:500">' + t + '</th>'; });
-    h += '</tr></thead><tbody>';
-    rows.forEach(function(r) { h += '<tr style="border-bottom:1px solid #f0f0f0">'; r.forEach(function(c) { h += '<td style="padding:8px 12px">' + c + '</td>'; }); h += '</tr>'; });
-    return h + '</tbody></table>';
-  }
-  function banner(msg, bg, fg) { return '<div style="padding:12px 16px;background:' + bg + ';border-radius:4px;color:' + fg + ';font-weight:500;margin-bottom:16px">' + msg + '</div>'; }
-  function loading() { return '<div style="color:#999;padding:16px 0">Cargando...</div>'; }
-  function card(html) { return '<div style="padding:16px;background:#fff;border:1px solid #e0e0e0;border-radius:4px">' + html + '</div>'; }
+/* === XPX Features === */
+(function(){
+var ICONS={
+gitops:'M6 2a4 4 0 00-4 4c0 1.82 1.22 3.35 2.88 3.84A3.99 3.99 0 006 14a4 4 0 003.88-3.04A4.01 4.01 0 0014 10a4 4 0 10-4-4c0 .73.2 1.41.55 2H9.45c.35-.59.55-1.27.55-2a4 4 0 00-4-4zm0 2a2 2 0 110 4 2 2 0 010-4zm8 0a2 2 0 110 4 2 2 0 010-4zM6 10a2 2 0 110 4 2 2 0 010-4z',
+updates:'M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 2.48-.94 4.96-2.82 6.86-3.72 3.72-9.76 3.72-13.48 0s-3.72-9.76 0-13.48c3.72-3.72 9.76-3.72 13.48 0L21 2v8.12z',
+prune:'M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12V5z',
+backup:'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z',
+clusters:'M17 16l-4-4V8.82C14.16 8.4 15 7.3 15 6c0-1.66-1.34-3-3-3S9 4.34 9 6c0 1.3.84 2.4 2 2.82V12l-4 4H2v5h5v-3.05l4-4.2 4 4.2V21h5v-5h-3z',
+teams:'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+alerts:'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z',
+audit:'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z'
+};
+var ITEMS=[
+{id:'gitops',label:'GitOps',icon:ICONS.gitops},
+{id:'updates',label:'Image Updates',icon:ICONS.updates},
+{id:'prune',label:'System Prune',icon:ICONS.prune},
+{id:'backup',label:'S3 Backup',icon:ICONS.backup},
+{id:'clusters',label:'Clusters',icon:ICONS.clusters},
+{id:'teams',label:'Teams',icon:ICONS.teams},
+{id:'alerts',label:'Alerts',icon:ICONS.alerts},
+{id:'audit',label:'Audit Log',icon:ICONS.audit}
+];
 
-  var ICONS = {
-    gitops: 'M6 2a2 2 0 0 0-2 2v1.17A3.001 3.001 0 0 0 2 8a3 3 0 0 0 2 2.83V14a2 2 0 0 0 2 2h3.17A3.001 3.001 0 0 0 12 18a3 3 0 0 0 2.83-2H18a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6zm0 2h12v10h-3.17A3.001 3.001 0 0 0 12 12a3 3 0 0 0-2.83 2H6v-3.17A3.001 3.001 0 0 0 8 8a3 3 0 0 0-2-2.83V4zm-1 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
-    updates: 'M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 2.48-.94 4.96-2.82 6.86-3.72 3.72-9.76 3.72-13.48 0s-3.72-9.76 0-13.48 9.76-3.72 13.48 0L21 2v8.12z',
-    prune: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
-    backup: 'M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z'
+function api(method,path,body){
+  var opts={method:method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  return fetch(path,opts).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e})});
+}
+function heading(t){return '<h5 style="margin:0 0 16px;font-size:1.25rem;font-weight:500">'+t+'</h5>';}
+function btn(id,label,color){return '<button id="'+id+'" style="padding:6px 16px;margin:4px;border:none;border-radius:4px;background:'+(color||'#1976d2')+';color:#fff;cursor:pointer;font-size:.875rem">'+label+'</button>';}
+function loading(id){return '<div id="'+id+'" style="display:none;padding:8px"><em>Loading...</em></div>';}
+function table(headers,rows){
+  var h=headers.map(function(x){return '<th style="padding:8px 12px;text-align:left;border-bottom:2px solid #e0e0e0">'+x+'</th>'}).join('');
+  var r=rows.map(function(row){return '<tr>'+row.map(function(c){return '<td style="padding:8px 12px;border-bottom:1px solid #eee">'+c+'</td>'}).join('')+'</tr>'}).join('');
+  return '<table style="width:100%;border-collapse:collapse">'+h+r+'</table>';
+}
+function statusBadge(s){var c=s==='active'||s==='synced'||s==='up-to-date'?'#4caf50':s==='error'||s==='failed'?'#f44336':'#ff9800';return '<span style="color:'+c+';font-weight:500">'+s+'</span>';}
+
+/* Sidebar injection */
+function makeSidebarItem(item){
+  return '<a class="MuiButtonBase-root MuiListItem-root Swarmpit-drawer-item MuiListItem-dense MuiListItem-gutters MuiListItem-button" href="#/xpx/'+item.id+'">'
+    +'<div class="MuiListItemIcon-root Swarmpit-drawer-item-icon" color="primary">'
+    +'<svg class="MuiSvgIcon-root" focusable="false" viewBox="0 0 24 24" aria-hidden="true" role="presentation"><path d="'+item.icon+'"/></svg>'
+    +'</div><div class="MuiListItemText-root Swarmpit-drawer-item-text MuiListItemText-dense">'
+    +'<h6 class="MuiTypography-root MuiTypography-subtitle2">'+item.label+'</h6></div></a>';
+}
+function makeSidebar(){
+  var h='<li class="MuiListItem-root Swarmpit-drawer-category MuiListItem-gutters Mui-disabled" disabled="">'
+    +'<div class="MuiListItemText-root Swarmpit-drawer-category-text">'
+    +'<span class="MuiTypography-root MuiListItemText-primary MuiTypography-body1">TOOLS</span></div></li>';
+  return h+ITEMS.map(makeSidebarItem).join('');
+}
+function injectSidebar(){
+  if(document.getElementById('xpx-tools'))return ensureToolsAtEnd();
+  var nav=document.querySelector('nav');if(!nav)return;
+  var content=nav.querySelector('.Swarmpit-drawer-content');if(!content)return;
+  var navList=content.children[1];if(!navList)return;
+  var wrap=document.createElement('div');wrap.id='xpx-tools';wrap.innerHTML=makeSidebar();
+  navList.appendChild(wrap);
+}
+function ensureToolsAtEnd(){
+  var wrap=document.getElementById('xpx-tools');if(!wrap)return;
+  var parent=wrap.parentNode;if(parent&&parent.lastElementChild!==wrap)parent.appendChild(wrap);
+}
+setInterval(injectSidebar,2000);
+
+/* Page rendering */
+function getPage(){
+  var p=document.getElementById('xpx-page');
+  if(!p){p=document.createElement('div');p.id='xpx-page';p.style.cssText='position:absolute;top:0;left:0;right:0;bottom:0;background:#fff;z-index:1200;padding:24px;overflow:auto';
+    var main=document.querySelector('main')||document.body;main.style.position='relative';main.appendChild(p);}
+  p.style.display='block';return p;
+}
+function hidePage(){var p=document.getElementById('xpx-page');if(p)p.style.display='none';}
+
+function renderPage(){
+  var hash=location.hash;
+  if(hash.indexOf('#/xpx/')!==0){hidePage();return;}
+  var route=hash.replace('#/xpx/','');
+  var p=getPage();
+  var views={gitops:viewGitOps,updates:viewUpdates,prune:viewPrune,backup:viewBackup,clusters:viewClusters,teams:viewTeams,alerts:viewAlerts,audit:viewAudit};
+  if(views[route])views[route](p);else p.innerHTML=heading('Not Found');
+}
+window.addEventListener('hashchange',renderPage);
+
+/* GitOps */
+function viewGitOps(p){
+  p.innerHTML=heading('GitOps')+btn('go-sync-all','Refresh','#1976d2')+loading('go-load')
+    +'<div id="go-list"></div><hr style="margin:16px 0">'
+    +'<h6>Add Repository</h6>'
+    +'<input id="go-stack" placeholder="Stack Name" style="margin:4px;padding:6px">'
+    +'<input id="go-repo" placeholder="Repository URL" style="margin:4px;padding:6px;width:300px">'
+    +'<input id="go-branch" placeholder="Branch" value="main" style="margin:4px;padding:6px">'
+    +'<input id="go-path" placeholder="Compose Path" value="docker-compose.yml" style="margin:4px;padding:6px">'
+    +'<input id="go-interval" placeholder="Sync Interval (s)" value="300" style="margin:4px;padding:6px;width:100px">'
+    +btn('go-create','Create','#4caf50');
+  loadGitOps();
+  p.querySelector('#go-sync-all').onclick=loadGitOps;
+  p.querySelector('#go-create').onclick=function(){
+    api('POST','/api/gitops',{stackName:g('go-stack'),repoUrl:g('go-repo'),branch:g('go-branch'),composePath:g('go-path'),syncInterval:parseInt(g('go-interval')),credentials:{}})
+      .then(loadGitOps).catch(alert);
   };
-  var ITEMS = [
-    { name: 'GitOps', hash: '#/xpx/gitops', icon: ICONS.gitops },
-    { name: 'Actualizaciones', hash: '#/xpx/updates', icon: ICONS.updates },
-    { name: 'Limpieza', hash: '#/xpx/prune', icon: ICONS.prune },
-    { name: 'Respaldo S3', hash: '#/xpx/backup', icon: ICONS.backup }
-  ];
+}
+function g(id){return document.getElementById(id).value;}
+function loadGitOps(){
+  var el=document.getElementById('go-list');if(!el)return;el.innerHTML='<em>Loading...</em>';
+  api('GET','/api/gitops').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No repositories configured.</p>';return;}
+    el.innerHTML=table(['Stack','Repository','Branch','Status','Last Sync','Actions'],
+      data.map(function(r){return [r.stackName,r.repoUrl,r.branch,statusBadge(r.status||'unknown'),r.lastSync||'-',
+        btn('','Sync','#1976d2').replace('<button','<button onclick="window._goSync(\''+r.id+'\')"')
+        +btn('','Delete','#f44336').replace('<button','<button onclick="window._goDel(\''+r.id+'\')"')
+      ]}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error loading</p>';});
+}
+window._goSync=function(id){api('POST','/api/gitops/'+id+'/sync').then(loadGitOps).catch(alert);};
+window._goDel=function(id){if(confirm('Delete this repo?'))api('DELETE','/api/gitops/'+id).then(loadGitOps).catch(alert);};
 
-  /* ── Sidebar injection ── */
-  function svgIcon(d) {
-    return '<svg class="MuiSvgIcon-root" focusable="false" viewBox="0 0 24 24" aria-hidden="true" role="presentation"><path d="' + d + '"/></svg>';
-  }
-  function injectSidebar() {
-    if (document.getElementById('xpx-tools')) return;
-    var nav = document.querySelector('nav');
-    if (!nav) return;
-    var content = nav.querySelector('.Swarmpit-drawer-content');
-    if (!content || content.children.length < 2) return;
-    var navList = content.children[1];
-    var w = document.createElement('div');
-    w.id = 'xpx-tools';
-    // Category header
-    var li = document.createElement('li');
-    li.className = 'MuiListItem-root Swarmpit-drawer-category MuiListItem-gutters Mui-disabled';
-    li.setAttribute('disabled', '');
-    li.innerHTML = '<div class="MuiListItemText-root Swarmpit-drawer-category-text"><span class="MuiTypography-root MuiListItemText-primary MuiTypography-body1">TOOLS</span></div>';
-    w.appendChild(li);
-    // Items
-    ITEMS.forEach(function(it) {
-      var a = document.createElement('a');
-      a.className = 'MuiButtonBase-root MuiListItem-root Swarmpit-drawer-item MuiListItem-dense MuiListItem-gutters MuiListItem-button';
-      a.href = it.hash;
-      a.innerHTML = '<div class="MuiListItemIcon-root Swarmpit-drawer-item-icon" color="primary">' + svgIcon(it.icon) + '</div>' +
-        '<div class="MuiListItemText-root Swarmpit-drawer-item-text MuiListItemText-dense"><h6 class="MuiTypography-root MuiTypography-subtitle2">' + it.name + '</h6></div>';
-      w.appendChild(a);
-    });
-    navList.appendChild(w);
-  }
-  function ensureToolsAtEnd() {
-    var t = document.getElementById('xpx-tools');
-    if (t && t.parentNode && t.parentNode.lastElementChild !== t) t.parentNode.appendChild(t);
-  }
+/* Image Updates */
+function viewUpdates(p){
+  p.innerHTML=heading('Image Updates')+btn('upd-check','Check Now','#1976d2')+loading('upd-load')+'<div id="upd-list"></div>';
+  p.querySelector('#upd-check').onclick=function(){
+    document.getElementById('upd-load').style.display='block';
+    api('POST','/api/services/check-updates').then(function(){
+      return api('GET','/api/services/update-status');
+    }).then(function(data){
+      document.getElementById('upd-load').style.display='none';
+      var el=document.getElementById('upd-list');
+      if(!data||!data.length){el.innerHTML='<p>All images are up to date.</p>';return;}
+      el.innerHTML=table(['Service','Image','Status'],data.map(function(r){return [r.service,r.image,statusBadge(r.status||'unknown')]}));
+    }).catch(function(e){document.getElementById('upd-load').style.display='none';alert(e);});
+  };
+}
 
-  /* ── Page rendering ── */
-  function renderPage() {
-    var h = window.location.hash;
-    if (h.indexOf('/xpx/') === -1) { var p = document.getElementById('xpx-page'); if (p) p.remove(); return; }
-    var main = document.querySelector('main');
-    if (!main) return;
-    var page = document.getElementById('xpx-page');
-    if (!page) {
-      page = document.createElement('div');
-      page.id = 'xpx-page';
-      page.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:#fafafa;z-index:100;padding:24px 32px;overflow:auto;font-family:Roboto,sans-serif';
-      main.style.position = 'relative';
-      main.appendChild(page);
-    }
-    page.innerHTML = loading();
-    if (h.indexOf('gitops') > -1) viewGitOps(page);
-    else if (h.indexOf('updates') > -1) viewUpdates(page);
-    else if (h.indexOf('prune') > -1) viewPrune(page);
-    else if (h.indexOf('backup') > -1) viewBackup(page);
-  }
+/* System Prune */
+function viewPrune(p){
+  p.innerHTML=heading('System Prune')
+    +'<label><input type="checkbox" id="pr-img" checked> Images</label> '
+    +'<label><input type="checkbox" id="pr-vol"> Volumes</label> '
+    +'<label><input type="checkbox" id="pr-net" checked> Networks</label><br><br>'
+    +btn('pr-preview','Preview','#ff9800')+btn('pr-run','Prune Now','#f44336')+loading('pr-load')+'<div id="pr-result"></div>';
+  p.querySelector('#pr-preview').onclick=function(){doPrune(true)};
+  p.querySelector('#pr-run').onclick=function(){if(confirm('This will remove unused resources. Continue?'))doPrune(false)};
+}
+function doPrune(dry){
+  var el=document.getElementById('pr-result');el.innerHTML='<em>Working...</em>';
+  api('POST','/api/system/prune',{images:document.getElementById('pr-img').checked,volumes:document.getElementById('pr-vol').checked,networks:document.getElementById('pr-net').checked,dryRun:dry})
+    .then(function(data){
+      var lines=[];
+      if(data.images)lines.push('Images: '+data.images.length+' removed');
+      if(data.volumes)lines.push('Volumes: '+data.volumes.length+' removed');
+      if(data.networks)lines.push('Networks: '+data.networks.length+' removed');
+      if(data.spaceReclaimed)lines.push('Space reclaimed: '+data.spaceReclaimed);
+      el.innerHTML=(dry?'<strong>Preview:</strong><br>':'<strong>Done:</strong><br>')+lines.join('<br>');
+    }).catch(function(e){el.innerHTML='<p style="color:red">Error: '+e+'</p>';});
+}
 
-  /* ── GitOps ── */
-  function viewGitOps(el) {
-    el.innerHTML = heading('GitOps Stacks') + '<div id="go-list">' + loading() + '</div>' +
-      '<div style="margin-top:16px">' + btn('go-add', '+ Nuevo Stack', '#2e7d32') + '</div><div id="go-form-wrap"></div>';
-    loadStacks();
-    el.querySelector('#go-add').onclick = function() { showGitOpsForm(); };
-  }
-  function loadStacks() {
-    api('GET', '/api/gitops').then(function(data) {
-      var el = document.getElementById('go-list');
-      if (!el) return;
-      if (!data || !data.length) { el.innerHTML = '<p style="color:#999">Sin stacks configurados.</p>'; return; }
-      var statusMap = function(gs) {
-        if (gs.lastError) return '<span style="color:#d32f2f;font-weight:500">Error</span>';
-        if (gs.lastHash) return '<span style="color:#2e7d32;font-weight:500">OK</span>';
-        return '<span style="color:#9e9e9e">Pendiente</span>';
-      };
-      var rows = data.map(function(gs) {
-        return [gs.stackName, '<span style="max-width:220px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + gs.repoUrl + '</span>',
-          gs.branch, statusMap(gs), gs.lastSync || '-',
-          btn('', 'Sync', '#1976d2').replace('id=""', 'data-sync="' + gs.id + '"') +
-          btn('', 'Eliminar', '#d32f2f').replace('id=""', 'data-del="' + gs.id + '"')];
-      });
-      el.innerHTML = tbl(['Stack', 'Repositorio', 'Branch', 'Estado', 'Último Sync', 'Acciones'], rows);
-      el.querySelectorAll('[data-sync]').forEach(function(b) {
-        b.onclick = function() { b.textContent = '...'; api('POST', '/api/gitops/' + b.dataset.sync + '/sync').then(loadStacks).catch(function() { b.textContent = 'Sync'; }); };
-      });
-      el.querySelectorAll('[data-del]').forEach(function(b) {
-        b.onclick = function() { if (confirm('¿Eliminar este stack?')) api('DELETE', '/api/gitops/' + b.dataset.del).then(loadStacks); };
-      });
-    }).catch(function(e) { var el = document.getElementById('go-list'); if (el) el.innerHTML = banner('Error: ' + (e.message || e), '#ffebee', '#c62828'); });
-  }
-  function showGitOpsForm() {
-    var wrap = document.getElementById('go-form-wrap');
-    if (!wrap || document.getElementById('go-form')) return;
-    var inp = function(id, ph, val) { return '<input id="' + id + '" placeholder="' + ph + '" value="' + (val || '') + '" style="width:100%;padding:8px;margin-bottom:8px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;font-size:.875rem">'; };
-    wrap.innerHTML = card(
-      '<div style="font-weight:500;margin-bottom:12px">Nuevo Stack GitOps</div>' +
-      inp('gf-name', 'Nombre del Stack') + inp('gf-repo', 'URL del Repositorio') +
-      '<div style="display:flex;gap:8px">' + '<div style="flex:1">' + inp('gf-branch', 'Branch', 'main') + '</div><div style="flex:1">' + inp('gf-path', 'Compose Path', 'docker-compose.yml') + '</div></div>' +
-      inp('gf-interval', 'Intervalo sync (seg, 0=manual)', '0') +
-      inp('gf-creds', 'Credenciales (opcional)') +
-      btn('gf-ok', 'Crear', '#2e7d32') + btn('gf-no', 'Cancelar', '#757575')
-    );
-    wrap.id = 'go-form-wrap';
-    document.getElementById('gf-no').onclick = function() { wrap.innerHTML = ''; };
-    document.getElementById('gf-ok').onclick = function() {
-      var b = { stackName: document.getElementById('gf-name').value, repoUrl: document.getElementById('gf-repo').value,
-        branch: document.getElementById('gf-branch').value, composePath: document.getElementById('gf-path').value,
-        syncInterval: parseInt(document.getElementById('gf-interval').value) || 0 };
-      var c = document.getElementById('gf-creds').value; if (c) b.credentials = c;
-      api('POST', '/api/gitops', b).then(function() { wrap.innerHTML = ''; loadStacks(); }).catch(function(e) { alert('Error: ' + (e.message || e)); });
-    };
-  }
+/* S3 Backup */
+function viewBackup(p){
+  p.innerHTML=heading('S3 Backup')+btn('bk-now','Backup Now','#1976d2')+loading('bk-load')+'<div id="bk-list"></div>';
+  loadBackups();
+  p.querySelector('#bk-now').onclick=function(){
+    document.getElementById('bk-load').style.display='block';
+    api('POST','/api/backup/s3').then(function(){document.getElementById('bk-load').style.display='none';loadBackups();}).catch(function(e){document.getElementById('bk-load').style.display='none';alert(e);});
+  };
+}
+function loadBackups(){
+  var el=document.getElementById('bk-list');if(!el)return;el.innerHTML='<em>Loading...</em>';
+  api('GET','/api/backup/s3').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No backups found.</p>';return;}
+    el.innerHTML=table(['Key','Date','Size','Actions'],data.map(function(r){return [r.key,r.date||r.lastModified||'-',r.size||'-',
+      btn('','Restore','#ff9800').replace('<button','<button onclick="window._bkRestore(\''+r.key+'\')"')]}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error loading backups</p>';});
+}
+window._bkRestore=function(key){if(confirm('Restore from '+key+'?'))api('POST','/api/restore/s3',{key:key}).then(function(){alert('Restore initiated')}).catch(alert);};
 
-  /* ── Image Updates ── */
-  function viewUpdates(el) {
-    el.innerHTML = heading('Actualizaciones de Imágenes') +
-      '<p style="color:#666;font-size:.875rem;margin:0 0 16px">Verifica si hay imágenes más recientes disponibles para los servicios en ejecución.</p>' +
-      btn('up-check', 'Verificar Ahora') + '<div id="up-result" style="margin-top:16px"></div>';
-    el.querySelector('#up-check').onclick = function() {
-      var b = this; b.disabled = true; b.textContent = 'Verificando...';
-      document.getElementById('up-result').innerHTML = loading();
-      api('POST', '/api/services/check-updates').then(function(data) {
-        b.disabled = false; b.textContent = 'VERIFICAR AHORA';
-        var r = document.getElementById('up-result');
-        if (!r) return;
-        if (!data || !data.length) { r.innerHTML = banner('Todas las imágenes están actualizadas.', '#e8f5e9', '#2e7d32'); return; }
-        var rows = data.map(function(u) {
-          var st = u.updateAvailable ? '<span style="color:#e65100;font-weight:500">Actualización disponible</span>' : '<span style="color:#2e7d32">Al día</span>';
-          return [u.serviceName, '<code style="font-size:.8rem;background:#f5f5f5;padding:2px 6px;border-radius:3px">' + u.currentImage + '</code>', st];
-        });
-        var upCount = data.filter(function(u) { return u.updateAvailable; }).length;
-        r.innerHTML = (upCount > 0 ? banner(upCount + ' actualización(es) disponible(s)', '#fff3e0', '#e65100') : banner('Todo al día', '#e8f5e9', '#2e7d32')) +
-          tbl(['Servicio', 'Imagen Actual', 'Estado'], rows);
-      }).catch(function(e) {
-        b.disabled = false; b.textContent = 'VERIFICAR AHORA';
-        document.getElementById('up-result').innerHTML = banner('Error: ' + (e.message || e), '#ffebee', '#c62828');
-      });
-    };
-  }
+/* Clusters */
+function viewClusters(p){
+  p.innerHTML=heading('Clusters')+btn('cl-refresh','Refresh','#1976d2')+'<div id="cl-list"></div><hr style="margin:16px 0">'
+    +'<h6>Add Cluster</h6>'
+    +'<input id="cl-name" placeholder="Name" style="margin:4px;padding:6px">'
+    +'<input id="cl-url" placeholder="URL" style="margin:4px;padding:6px;width:300px">'
+    +btn('cl-create','Add','#4caf50');
+  loadClusters();
+  p.querySelector('#cl-refresh').onclick=loadClusters;
+  p.querySelector('#cl-create').onclick=function(){
+    api('POST','/api/clusters',{name:g('cl-name'),url:g('cl-url')}).then(loadClusters).catch(alert);
+  };
+}
+function loadClusters(){
+  var el=document.getElementById('cl-list');if(!el)return;el.innerHTML='<em>Loading...</em>';
+  api('GET','/api/clusters').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No clusters configured.</p>';return;}
+    el.innerHTML=table(['Name','URL','Status','Actions'],data.map(function(r){return [r.name,r.url,statusBadge(r.status||'unknown'),
+      btn('','Activate','#4caf50').replace('<button','<button onclick="window._clAct(\''+r.id+'\')"')
+      +btn('','Delete','#f44336').replace('<button','<button onclick="window._clDel(\''+r.id+'\')"')]}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error</p>';});
+}
+window._clAct=function(id){api('POST','/api/clusters/'+id+'/activate').then(loadClusters).catch(alert);};
+window._clDel=function(id){if(confirm('Delete cluster?'))api('DELETE','/api/clusters/'+id).then(loadClusters).catch(alert);};
 
-  /* ── System Prune ── */
-  function viewPrune(el) {
-    var chk = function(id, label) { return '<label style="margin-right:16px;font-size:.875rem;cursor:pointer"><input type="checkbox" id="' + id + '" checked style="margin-right:4px">' + label + '</label>'; };
-    el.innerHTML = heading('Limpieza del Sistema') +
-      '<p style="color:#666;font-size:.875rem;margin:0 0 12px">Elimina recursos Docker no utilizados.</p>' +
-      '<div style="margin-bottom:16px">' + chk('pr-img', 'Imágenes') + chk('pr-vol', 'Volúmenes') + chk('pr-net', 'Redes') + '</div>' +
-      btn('pr-preview', 'Vista Previa') + btn('pr-exec', 'Limpiar Ahora', '#d32f2f') +
-      '<div id="pr-result" style="margin-top:16px"></div>';
-    el.querySelector('#pr-preview').onclick = function() { doPrune(true); };
-    el.querySelector('#pr-exec').onclick = function() { if (confirm('¿Eliminar todos los recursos no utilizados? Esta acción no se puede deshacer.')) doPrune(false); };
-  }
-  function doPrune(dry) {
-    var body = { images: document.getElementById('pr-img').checked, volumes: document.getElementById('pr-vol').checked, networks: document.getElementById('pr-net').checked, dryRun: dry };
-    var r = document.getElementById('pr-result'); if (r) r.innerHTML = loading();
-    api('POST', '/api/system/prune', body).then(function(d) {
-      if (!r) return;
-      var fmt = function(b) { return b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : (b / 1e3).toFixed(0) + ' KB'; };
-      var row = function(label, obj) { return '<tr><td style="padding:4px 16px 4px 0;font-weight:500">' + label + '</td><td>' + (obj ? obj.count || 0 : 0) + '</td><td style="color:#666">' + (obj && obj.spaceReclaimed ? fmt(obj.spaceReclaimed) : '-') + '</td></tr>'; };
-      r.innerHTML = banner(dry ? 'Vista previa — sin cambios realizados' : 'Limpieza completada', dry ? '#e3f2fd' : '#e8f5e9', dry ? '#1565c0' : '#2e7d32') +
-        card('<table style="font-size:.875rem"><thead><tr><th style="text-align:left;padding:4px 16px 4px 0">Categoría</th><th style="text-align:left;padding:4px 16px 4px 0">Eliminados</th><th style="text-align:left">Espacio</th></tr></thead><tbody>' +
-          row('Imágenes', d.images) + row('Volúmenes', d.volumes) + row('Redes', d.networks) + '</tbody></table>');
-    }).catch(function(e) { if (r) r.innerHTML = banner('Error: ' + (e.message || e), '#ffebee', '#c62828'); });
-  }
+/* Teams */
+function viewTeams(p){
+  p.innerHTML=heading('Teams')+btn('tm-refresh','Refresh','#1976d2')+'<div id="tm-list"></div><hr style="margin:16px 0">'
+    +'<h6>Create Team</h6>'
+    +'<input id="tm-name" placeholder="Team Name" style="margin:4px;padding:6px">'
+    +btn('tm-create','Create','#4caf50');
+  loadTeams();
+  p.querySelector('#tm-refresh').onclick=loadTeams;
+  p.querySelector('#tm-create').onclick=function(){
+    api('POST','/api/teams',{name:g('tm-name')}).then(loadTeams).catch(alert);
+  };
+}
+function loadTeams(){
+  var el=document.getElementById('tm-list');if(!el)return;el.innerHTML='<em>Loading...</em>';
+  api('GET','/api/teams').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No teams.</p>';return;}
+    el.innerHTML=table(['Name','Members','Actions'],data.map(function(r){return [r.name,(r.members||[]).length,
+      btn('','Delete','#f44336').replace('<button','<button onclick="window._tmDel(\''+r.id+'\')"')]}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error</p>';});
+}
+window._tmDel=function(id){if(confirm('Delete team?'))api('DELETE','/api/teams/'+id).then(loadTeams).catch(alert);};
 
-  /* ── S3 Backup ── */
-  function viewBackup(el) {
-    el.innerHTML = heading('Respaldo S3') +
-      btn('bk-now', 'Respaldar Ahora', '#2e7d32') +
-      '<div id="bk-status" style="margin-top:12px"></div>' +
-      '<div id="bk-list" style="margin-top:16px">' + loading() + '</div>';
-    el.querySelector('#bk-now').onclick = function() {
-      var b = this; b.disabled = true; b.textContent = 'Respaldando...';
-      document.getElementById('bk-status').innerHTML = loading();
-      api('POST', '/api/backup/s3').then(function() {
-        b.disabled = false; b.textContent = 'RESPALDAR AHORA';
-        document.getElementById('bk-status').innerHTML = banner('Respaldo creado exitosamente.', '#e8f5e9', '#2e7d32');
-        loadBackups();
-      }).catch(function(e) {
-        b.disabled = false; b.textContent = 'RESPALDAR AHORA';
-        document.getElementById('bk-status').innerHTML = banner('Error: ' + (e.message || e), '#ffebee', '#c62828');
-      });
-    };
-    loadBackups();
-  }
-  function loadBackups() {
-    api('GET', '/api/backup/s3').then(function(data) {
-      var el = document.getElementById('bk-list');
-      if (!el) return;
-      if (!data || !data.length) { el.innerHTML = '<p style="color:#999">Sin respaldos disponibles.</p>'; return; }
-      var fmt = function(b) { return b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : (b / 1e3).toFixed(0) + ' KB'; };
-      var rows = data.map(function(bk) {
-        return [bk.key, bk.date || bk.lastModified || '-', bk.size ? fmt(bk.size) : '-',
-          btn('', 'Restaurar', '#e65100').replace('id=""', 'data-restore="' + bk.key + '"')];
-      });
-      el.innerHTML = tbl(['Clave', 'Fecha', 'Tamaño', 'Acciones'], rows);
-      el.querySelectorAll('[data-restore]').forEach(function(b) {
-        b.onclick = function() {
-          if (confirm('¿Restaurar desde este respaldo? Los datos actuales serán reemplazados.'))  {
-            b.disabled = true; b.textContent = 'Restaurando...';
-            api('POST', '/api/restore/s3', { key: b.dataset.restore }).then(function() {
-              alert('Restauración completada.'); loadBackups();
-            }).catch(function(e) { alert('Error: ' + (e.message || e)); b.disabled = false; b.textContent = 'RESTAURAR'; });
-          }
-        };
-      });
-    }).catch(function(e) { var el = document.getElementById('bk-list'); if (el) el.innerHTML = banner('Error: ' + (e.message || e), '#ffebee', '#c62828'); });
-  }
+/* Alerts */
+function viewAlerts(p){
+  p.innerHTML=heading('Alerts')+btn('al-refresh','Refresh','#1976d2')+btn('al-history','History','#ff9800')
+    +'<div id="al-list"></div><div id="al-hist" style="display:none"></div><hr style="margin:16px 0">'
+    +'<h6>Create Rule</h6>'
+    +'<input id="al-name" placeholder="Rule Name" style="margin:4px;padding:6px">'
+    +'<input id="al-cond" placeholder="Condition" style="margin:4px;padding:6px;width:300px">'
+    +btn('al-create','Create','#4caf50');
+  loadAlerts();
+  p.querySelector('#al-refresh').onclick=function(){document.getElementById('al-hist').style.display='none';loadAlerts();};
+  p.querySelector('#al-history').onclick=loadAlertHistory;
+  p.querySelector('#al-create').onclick=function(){
+    api('POST','/api/alerts',{name:g('al-name'),condition:g('al-cond')}).then(loadAlerts).catch(alert);
+  };
+}
+function loadAlerts(){
+  var el=document.getElementById('al-list');if(!el)return;el.innerHTML='<em>Loading...</em>';
+  api('GET','/api/alerts').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No alert rules.</p>';return;}
+    el.innerHTML=table(['Name','Condition','Status','Actions'],data.map(function(r){return [r.name,r.condition||'-',statusBadge(r.status||'active'),
+      btn('','Delete','#f44336').replace('<button','<button onclick="window._alDel(\''+r.id+'\')"')]}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error</p>';});
+}
+function loadAlertHistory(){
+  var el=document.getElementById('al-hist');el.style.display='block';el.innerHTML='<em>Loading history...</em>';
+  api('GET','/api/alerts/history').then(function(data){
+    if(!data||!data.length){el.innerHTML='<p>No alert history.</p>';return;}
+    el.innerHTML='<h6>Alert History</h6>'+table(['Time','Rule','Status','Details'],data.map(function(r){return [r.timestamp||'-',r.rule||'-',statusBadge(r.status||'-'),r.details||'-']}));
+  }).catch(function(e){el.innerHTML='<p style="color:red">Error</p>';});
+}
+window._alDel=function(id){if(confirm('Delete rule?'))api('DELETE','/api/alerts/'+id).then(loadAlerts).catch(alert);};
 
-  /* ── Init ── */
-  window.addEventListener('hashchange', function() { setTimeout(renderPage, 300); });
-  setInterval(function() {
-    if (!getToken()) return;
-    injectSidebar();
-    ensureToolsAtEnd();
-  }, 2000);
-  var _fi = setInterval(function() {
-    if (!getToken()) return;
-    injectSidebar();
-    renderPage();
-    if (document.getElementById('xpx-tools')) clearInterval(_fi);
-  }, 300);
+/* Audit Log */
+function viewAudit(p){
+  p.innerHTML=heading('Audit Log')+'<div id="au-list"><em>Loading...</em></div>';
+  api('GET','/api/audit').then(function(data){
+    var el=document.getElementById('au-list');
+    if(!data||!data.length){el.innerHTML='<p>No audit entries.</p>';return;}
+    el.innerHTML=table(['Timestamp','User','Action','Resource','Details'],data.map(function(r){return [r.timestamp||'-',r.user||'-',r.action||'-',r.resource||'-',r.details||'-']}));
+  }).catch(function(e){document.getElementById('au-list').innerHTML='<p style="color:red">Error</p>';});
+}
+
+/* Init */
+setTimeout(function(){injectSidebar();renderPage();},1000);
 })();
