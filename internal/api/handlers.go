@@ -1646,15 +1646,25 @@ func fetchAndReturnTags(w http.ResponseWriter, repo string) {
 	if len(parts) >= 2 && strings.Contains(parts[0], ".") {
 		host := parts[0]
 		tags, err := fetchAuthenticatedTags(host, parts[1])
-		if err == nil { json200(w, tags); return }
+		if err == nil { json200(w, tagsToStrings(tags)); return }
 	}
 	// Try DockerHub, then generic v2
 	tags, err := fetchDockerHubTags(repo)
 	if err != nil {
 		tags, err = fetchRegistryV2Tags(repo)
-		if err != nil { json200(w, []any{}); return }
+		if err != nil { json200(w, []string{}); return }
 	}
-	json200(w, tags)
+	json200(w, tagsToStrings(tags))
+}
+
+func tagsToStrings(tags []map[string]any) []string {
+	result := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if name, ok := t["name"].(string); ok {
+			result = append(result, name)
+		}
+	}
+	return result
 }
 
 // ── #47 Node edit — labels and availability ──
