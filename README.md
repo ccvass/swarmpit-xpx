@@ -44,6 +44,10 @@ A fork of [Swarmpit](https://github.com/swarmpit/swarmpit) with a Go backend rep
 - **Streaming logs** — real-time log streaming via SSE with ANSI color rendering
 - **Bulk stack import** — deploy multiple stacks in a single API call
 - **Backup/restore** — export/import all configuration with credential preservation
+- **S3 backup** — scheduled database backups to S3-compatible storage with retention policy
+- **System prune** — clean dangling images, unused volumes, and orphan networks with preview mode
+- **Image update checker** — detect newer images available for running services
+- **XPX Tools sidebar** — 8 integrated tool views: GitOps, Image Updates, System Prune, S3 Backup, Clusters, Teams, Alerts, Audit Log
 - **Built-in TLS** — optional HTTPS via environment variables
 - **Password reset CLI** — `./swarmpit reset-password <username>` command
 - **Swagger/OpenAPI** — API documentation at `/api-docs`
@@ -79,6 +83,13 @@ docker service create \
 | `SWARMPIT_TLS_KEY` | (none) | TLS private key path |
 | `SWARMPIT_WEBHOOK_SECRET` | (none) | HMAC secret for GitOps webhook validation |
 | `PORT` | `8080` | HTTP listen port |
+| `BACKUP_S3_ENDPOINT` | (none) | S3-compatible endpoint URL (e.g., `https://s3.amazonaws.com`) |
+| `BACKUP_S3_BUCKET` | (none) | S3 bucket name for backups |
+| `BACKUP_S3_REGION` | `us-east-1` | S3 region |
+| `BACKUP_S3_ACCESS_KEY` | (none) | S3 access key ID |
+| `BACKUP_S3_SECRET_KEY` | (none) | S3 secret access key |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to keep old backups |
+| `BACKUP_SCHEDULE` | (none) | Cron-like interval for auto-backup (seconds) |
 
 ### OAuth2 Configuration
 
@@ -121,7 +132,7 @@ go test ./... -race -cover
 go vet ./...
 
 # Docker image
-docker build -f Dockerfile.xpx -t swarmpit-xpx .
+docker build -f Dockerfile -t swarmpit-xpx .
 ```
 
 ## Test Coverage

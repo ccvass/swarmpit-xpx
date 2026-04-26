@@ -43,7 +43,7 @@ Project-specific development rules for Swarmpit XPX.
 ## Frontend
 
 - Legacy ClojureScript SPA (compiled, served as static files)
-- `xpx-features.js` — vanilla JS overlay adding: floating Tools panel, GitOps UI, image updates, system prune, compose auto-fill, ANSI log colors, piechart fix, update order toggle
+- `xpx-features.js` — vanilla JS overlay injecting sidebar items and full-page views for 8 XPX tools (GitOps, Image Updates, System Prune, S3 Backup, Clusters, Teams, Alerts, Audit Log). Uses native Swarmpit MUI CSS classes for theme-consistent rendering. Also patches CLJS PersistentVector/Subvec/LazySeq prototypes with Array methods (.filter, .map, .some, etc.) for MUI Autocomplete compatibility.
 
 ## Security
 
