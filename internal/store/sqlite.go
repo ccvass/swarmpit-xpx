@@ -507,7 +507,7 @@ func DeleteTemplate(id string) error {
 func ExportAll() (map[string]any, error) {
 	result := map[string]any{}
 	tables := map[string]string{
-		"users":          "SELECT id, username, role, email FROM users",
+		"users":          "SELECT id, username, password, role, email FROM users",
 		"registries":     "SELECT id, type, name, url, data FROM registries",
 		"webhooks":       "SELECT id, service_id, token, created_at, last_triggered FROM webhooks",
 		"alert_rules":    "SELECT id, type, condition, threshold, channel, target, enabled FROM alert_rules",
@@ -556,7 +556,7 @@ func ImportAll(data map[string]json.RawMessage) error {
 		cols   []string
 	}
 	tables := map[string]tableConf{
-		"users":          {"DELETE FROM users", "INSERT OR REPLACE INTO users (id, username, role, email) VALUES (?,?,?,?)", []string{"id", "username", "role", "email"}},
+		"users":          {"DELETE FROM users", "INSERT OR REPLACE INTO users (id, username, password, role, email) VALUES (?,?,?,?,?)", []string{"id", "username", "password", "role", "email"}},
 		"registries":     {"DELETE FROM registries", "INSERT OR REPLACE INTO registries (id, type, name, url, data) VALUES (?,?,?,?,?)", []string{"id", "type", "name", "url", "data"}},
 		"webhooks":       {"DELETE FROM webhooks", "INSERT OR REPLACE INTO webhooks (id, service_id, token, created_at, last_triggered) VALUES (?,?,?,?,?)", []string{"id", "service_id", "token", "created_at", "last_triggered"}},
 		"alert_rules":    {"DELETE FROM alert_rules", "INSERT OR REPLACE INTO alert_rules (id, type, condition, threshold, channel, target, enabled) VALUES (?,?,?,?,?,?,?)", []string{"id", "type", "condition", "threshold", "channel", "target", "enabled"}},

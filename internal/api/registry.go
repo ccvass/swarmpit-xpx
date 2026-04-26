@@ -15,50 +15,101 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 func fetchAuthenticatedTags(host, repo string) ([]map[string]any, error) {
 	reg, err := store.FindRegistryByHost(host)
-	if err != nil { return nil, err }
-	// GHCR token-based auth
-	if host == "ghcr.io" {
-		username, _ := reg["username"].(string)
-		password, _ := reg["password"].(string)
-		if password == "" { password, _ = reg["token"].(string) }
-		if password == "" { return nil, fmt.Errorf("no credentials") }
-		// Get token from ghcr.io auth endpoint
-		tokenURL := fmt.Sprintf("https://ghcr.io/token?scope=repository:%s:pull&service=ghcr.io", repo)
-		req, _ := http.NewRequest("GET", tokenURL, nil)
-		if username == "" { username = "token" }
-		req.SetBasicAuth(username, password)
-		resp, err := httpClient.Do(req)
-		if err != nil { return nil, err }
-		defer resp.Body.Close()
-		var tokenResp struct{ Token string `json:"token"` }
-		json.NewDecoder(resp.Body).Decode(&tokenResp)
-		if tokenResp.Token == "" { return nil, fmt.Errorf("auth failed") }
-		// Fetch tags with bearer token
-		tagsReq, _ := http.NewRequest("GET", fmt.Sprintf("https://ghcr.io/v2/%s/tags/list", repo), nil)
-		tagsReq.Header.Set("Authorization", "Bearer "+tokenResp.Token)
-		tresp, err := httpClient.Do(tagsReq)
-		if err != nil { return nil, err }
-		defer tresp.Body.Close()
-		var data struct{ Tags []string `json:"tags"` }
-		json.NewDecoder(tresp.Body).Decode(&data)
-		result := make([]map[string]any, len(data.Tags))
-		for i, t := range data.Tags { result[i] = map[string]any{"name": t} }
-		return result, nil
+	if err != nil {
+		return nil, err
 	}
-	// Generic v2 with basic auth
 	username, _ := reg["username"].(string)
 	password, _ := reg["password"].(string)
+	if password == "" {
+		password, _ = reg["token"].(string)
+	}
+
+	// GHCR token-based auth
+	if host == "ghcr.io" {
+		return fetchTagsWithBearer(
+			fmt.Sprintf("https://ghcr.io/token?scope=repository:%s:pull&service=ghcr.io", repo),
+			fmt.Sprintf("https://ghcr.io/v2/%s/tags/list", repo),
+			username, password,
+		)
+	}
+	// GitLab registry (#85)
+	if strings.Contains(host, "gitlab") || strings.Contains(host, "registry.gitlab") {
+		authURL := fmt.Sprintf("https://%s/jwt/auth?service=container_registry&scope=repository:%s:pull", host, repo)
+		return fetchTagsWithBearer(authURL, fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo), username, password)
+	}
+	// DockerHub (#85)
+	if host == "index.docker.io" || host == "registry-1.docker.io" || host == "docker.io" {
+		return fetchTagsWithBearer(
+			fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", repo),
+			fmt.Sprintf("https://registry-1.docker.io/v2/%s/tags/list", repo),
+			username, password,
+		)
+	}
+	// ECR — accept pre-generated token (#85)
+	if strings.Contains(host, ".dkr.ecr.") && strings.Contains(host, ".amazonaws.com") {
+		if password != "" {
+			req, _ := http.NewRequest("GET", fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo), nil)
+			req.SetBasicAuth("AWS", password)
+			return doTagsRequest(req)
+		}
+	}
+	// Generic v2 with basic auth
 	u := fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo)
 	req, _ := http.NewRequest("GET", u, nil)
-	if username != "" && password != "" { req.SetBasicAuth(username, password) }
+	if username != "" && password != "" {
+		req.SetBasicAuth(username, password)
+	}
+	return doTagsRequest(req)
+}
+
+// fetchTagsWithBearer gets a bearer token then fetches tags
+func fetchTagsWithBearer(tokenURL, tagsURL, username, password string) ([]map[string]any, error) {
+	req, _ := http.NewRequest("GET", tokenURL, nil)
+	if username != "" && password != "" {
+		req.SetBasicAuth(username, password)
+	} else if password != "" {
+		req.SetBasicAuth("token", password)
+	}
 	resp, err := httpClient.Do(req)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 { return nil, fmt.Errorf("registry returned %d", resp.StatusCode) }
-	var data struct{ Tags []string `json:"tags"` }
+	var tokenResp struct {
+		Token       string `json:"token"`
+		AccessToken string `json:"access_token"`
+	}
+	json.NewDecoder(resp.Body).Decode(&tokenResp)
+	tok := tokenResp.Token
+	if tok == "" {
+		tok = tokenResp.AccessToken
+	}
+	if tok == "" {
+		return nil, fmt.Errorf("auth failed: no token returned")
+	}
+	tagsReq, _ := http.NewRequest("GET", tagsURL, nil)
+	tagsReq.Header.Set("Authorization", "Bearer "+tok)
+	return doTagsRequest(tagsReq)
+}
+
+// doTagsRequest executes a tags/list request and returns parsed results
+func doTagsRequest(req *http.Request) ([]map[string]any, error) {
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("registry returned %d", resp.StatusCode)
+	}
+	var data struct {
+		Tags []string `json:"tags"`
+	}
 	json.NewDecoder(resp.Body).Decode(&data)
 	result := make([]map[string]any, len(data.Tags))
-	for i, t := range data.Tags { result[i] = map[string]any{"name": t} }
+	for i, t := range data.Tags {
+		result[i] = map[string]any{"name": t}
+	}
 	return result, nil
 }
 

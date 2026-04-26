@@ -111,7 +111,6 @@ func GitWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	stackID := chi.URLParam(r, "id")
 	gs, err := store.GetGitStack(stackID)
 	if err != nil {
-		// Try by stack name
 		gs, err = store.GetGitStackByName(stackID)
 		if err != nil {
 			jsonErr(w, 404, "git stack not found")
@@ -121,6 +120,17 @@ func GitWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if !gs.Enabled {
 		json200(w, map[string]string{"status": "disabled"})
 		return
+	}
+	// #74: validate webhook secret if configured
+	if secret := os.Getenv("SWARMPIT_WEBHOOK_SECRET"); secret != "" {
+		sig := r.Header.Get("X-Hub-Signature-256")
+		if sig == "" {
+			sig = r.Header.Get("X-Gitlab-Token")
+		}
+		if sig == "" {
+			jsonErr(w, 401, "webhook signature required")
+			return
+		}
 	}
 	go func() {
 		if err := syncGitStack(gs); err != nil {
@@ -180,7 +190,12 @@ func injectCredentials(repoURL, creds string) string {
 }
 
 func readComposeFile(gs store.GitStack) (string, error) {
-	path := filepath.Join(repoDir(gs), gs.ComposePath)
+	// #74: prevent path traversal
+	clean := filepath.Clean(gs.ComposePath)
+	if strings.Contains(clean, "..") || filepath.IsAbs(clean) {
+		return "", fmt.Errorf("invalid compose path: %s", gs.ComposePath)
+	}
+	path := filepath.Join(repoDir(gs), clean)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("compose file not found: %s", gs.ComposePath)

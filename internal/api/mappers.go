@@ -476,6 +476,18 @@ func mapService(s swarm.Service, tasks []swarm.Task, networks []types.NetworkRes
 			state = "running"
 		}
 	}
+	// #86: job-aware state — completed jobs with 0 running tasks are "completed"
+	if mode == "replicatedjob" || mode == "globaljob" {
+		completed := 0
+		for _, t := range tasks {
+			if t.ServiceID == s.ID && t.Status.State == swarm.TaskStateComplete {
+				completed++
+			}
+		}
+		if completed > 0 && running == 0 {
+			state = "completed"
+		}
+	}
 
 	// ports
 	ports := []map[string]any{}

@@ -24,16 +24,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Version_ is set by main.go from build-time ldflags.
+var Version_ = "dev"
+
 func json200(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
 }
 
 func jsonErr(w http.ResponseWriter, code int, msg string) {
+	slog.Warn("api error", "code", code, "msg", msg)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
+
+// #73: helper to check role from request
+func reqRole(r *http.Request) string { return r.Header.Get("X-Role") }
+func reqUser(r *http.Request) string { return r.Header.Get("X-User") }
 
 func Version(w http.ResponseWriter, r *http.Request) {
 	ver, _ := docker.Version()
@@ -48,7 +56,7 @@ func Version(w http.ResponseWriter, r *http.Request) {
 		instVal = instanceName
 	}
 	json200(w, map[string]any{
-		"name": "swarmpit-xpx", "version": "2.5.0", "revision": nil,
+		"name": "swarmpit-xpx", "version": Version_, "revision": nil,
 		"initialized": store.AdminExists(), "statistics": true, "instanceName": instVal,
 		"docker": map[string]any{"api": apiVer, "engine": ver.Version},
 	})
@@ -80,6 +88,100 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 	token, _ := auth.GenerateJWT(user.Username, user.Role)
 	json200(w, map[string]string{"token": "Bearer " + token})
+}
+
+// #70: OAuth2 login — redirects to provider
+func OAuthLogin(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	clientID := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_CLIENT_ID")
+	authURL := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_AUTH_URL")
+	redirectURI := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_REDIRECT_URI")
+	if clientID == "" || authURL == "" {
+		jsonErr(w, 400, "OAuth provider not configured: "+provider)
+		return
+	}
+	url := fmt.Sprintf("%s?client_id=%s&redirect_uri=%s&response_type=code&scope=openid+email+profile",
+		authURL, clientID, redirectURI)
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+// #70: OAuth2 callback — exchanges code for token, creates/finds user
+func OAuthCallback(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		jsonErr(w, 400, "missing code parameter")
+		return
+	}
+	clientID := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_CLIENT_ID")
+	clientSecret := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_CLIENT_SECRET")
+	tokenURL := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_TOKEN_URL")
+	userInfoURL := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_USERINFO_URL")
+	redirectURI := os.Getenv("OAUTH_" + strings.ToUpper(provider) + "_REDIRECT_URI")
+	if clientID == "" || clientSecret == "" || tokenURL == "" {
+		jsonErr(w, 500, "OAuth provider not fully configured")
+		return
+	}
+
+	// Exchange code for access token
+	data := fmt.Sprintf("grant_type=authorization_code&code=%s&client_id=%s&client_secret=%s&redirect_uri=%s",
+		code, clientID, clientSecret, redirectURI)
+	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data))
+	if err != nil {
+		jsonErr(w, 500, "token exchange failed: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	json.NewDecoder(resp.Body).Decode(&tokenResp)
+	if tokenResp.AccessToken == "" {
+		jsonErr(w, 401, "OAuth token exchange failed")
+		return
+	}
+
+	// Fetch user info
+	req, _ := http.NewRequest("GET", userInfoURL, nil)
+	req.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
+	uResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		jsonErr(w, 500, "userinfo fetch failed")
+		return
+	}
+	defer uResp.Body.Close()
+	var userInfo struct {
+		Email    string `json:"email"`
+		Username string `json:"preferred_username"`
+		Name     string `json:"name"`
+		Sub      string `json:"sub"`
+	}
+	json.NewDecoder(uResp.Body).Decode(&userInfo)
+	username := userInfo.Username
+	if username == "" {
+		username = userInfo.Email
+	}
+	if username == "" {
+		username = userInfo.Sub
+	}
+
+	// Find or create user
+	user := store.GetUserByUsername(username)
+	if user == nil {
+		defaultRole := os.Getenv("OAUTH_DEFAULT_ROLE")
+		if defaultRole == "" {
+			defaultRole = "user"
+		}
+		created, err := store.CreateUser(username, "oauth-"+provider, defaultRole, userInfo.Email)
+		if err != nil {
+			jsonErr(w, 500, "user creation failed: "+err.Error())
+			return
+		}
+		user = created
+	}
+
+	jwtToken, _ := auth.GenerateJWT(user.Username, user.Role)
+	json200(w, map[string]string{"token": "Bearer " + jwtToken})
 }
 
 func Initialize(w http.ResponseWriter, r *http.Request) {
@@ -357,84 +459,309 @@ func StackCompose(w http.ResponseWriter, r *http.Request) {
 
 func generateStackCompose(stackName string) string {
 	services, _ := docker.Services()
+	networks, _ := docker.Networks()
+	netMap := map[string]string{}
+	for _, n := range networks {
+		netMap[n.ID] = n.Name
+	}
+
 	var stackServices []swarm.Service
 	for _, s := range services {
 		if s.Spec.Labels["com.docker.stack.namespace"] == stackName {
 			stackServices = append(stackServices, s)
 		}
 	}
-	if len(stackServices) == 0 { return "" }
+	if len(stackServices) == 0 {
+		return ""
+	}
 
-	// Build compose YAML from service specs
-	compose := "version: '3.8'\nservices:\n"
+	compose := map[string]any{"version": "3.8"}
+	svcMap := map[string]any{}
+	allNets := map[string]bool{}
+
 	for _, svc := range stackServices {
 		svcName := strings.TrimPrefix(svc.Spec.Name, stackName+"_")
-		compose += "  " + svcName + ":\n"
-		compose += "    image: " + svc.Spec.TaskTemplate.ContainerSpec.Image + "\n"
-		if len(svc.Spec.TaskTemplate.ContainerSpec.Env) > 0 {
-			compose += "    environment:\n"
-			for _, e := range svc.Spec.TaskTemplate.ContainerSpec.Env {
-				compose += "      - " + e + "\n"
-			}
+		cs := svc.Spec.TaskTemplate.ContainerSpec
+		tt := svc.Spec.TaskTemplate
+		s := map[string]any{"image": cs.Image}
+
+		if len(cs.Command) > 0 {
+			s["entrypoint"] = cs.Command
 		}
-		if svc.Spec.TaskTemplate.ContainerSpec.Command != nil {
-			compose += "    command:"
-			for _, c := range svc.Spec.TaskTemplate.ContainerSpec.Command {
-				compose += " " + c
-			}
-			compose += "\n"
+		if len(cs.Args) > 0 {
+			s["command"] = cs.Args
 		}
-		if svc.Endpoint.Ports != nil {
-			compose += "    ports:\n"
+		if len(cs.Env) > 0 {
+			s["environment"] = cs.Env
+		}
+		if cs.Hostname != "" {
+			s["hostname"] = cs.Hostname
+		}
+		if cs.User != "" {
+			s["user"] = cs.User
+		}
+		if cs.Dir != "" {
+			s["working_dir"] = cs.Dir
+		}
+		if cs.TTY {
+			s["tty"] = true
+		}
+		if cs.Init != nil && *cs.Init {
+			s["init"] = true
+		}
+		if cs.ReadOnly {
+			s["read_only"] = true
+		}
+		if cs.StopGracePeriod != nil {
+			s["stop_grace_period"] = fmt.Sprintf("%ds", int64(*cs.StopGracePeriod)/1e9)
+		}
+		if len(cs.CapabilityAdd) > 0 {
+			s["cap_add"] = cs.CapabilityAdd
+		}
+		if len(cs.CapabilityDrop) > 0 {
+			s["cap_drop"] = cs.CapabilityDrop
+		}
+		if len(cs.Sysctls) > 0 {
+			s["sysctls"] = cs.Sysctls
+		}
+		if len(cs.DNSConfig.Nameservers) > 0 {
+			s["dns"] = cs.DNSConfig.Nameservers
+		}
+		if len(cs.Hosts) > 0 {
+			s["extra_hosts"] = cs.Hosts
+		}
+		if cs.Healthcheck != nil && len(cs.Healthcheck.Test) > 0 {
+			hc := map[string]any{"test": cs.Healthcheck.Test}
+			if cs.Healthcheck.Interval > 0 {
+				hc["interval"] = fmt.Sprintf("%ds", int64(cs.Healthcheck.Interval)/1e9)
+			}
+			if cs.Healthcheck.Timeout > 0 {
+				hc["timeout"] = fmt.Sprintf("%ds", int64(cs.Healthcheck.Timeout)/1e9)
+			}
+			if cs.Healthcheck.Retries > 0 {
+				hc["retries"] = cs.Healthcheck.Retries
+			}
+			if cs.Healthcheck.StartPeriod > 0 {
+				hc["start_period"] = fmt.Sprintf("%ds", int64(cs.Healthcheck.StartPeriod)/1e9)
+			}
+			s["healthcheck"] = hc
+		}
+
+		// Ports
+		if len(svc.Endpoint.Ports) > 0 {
+			var ports []string
 			for _, p := range svc.Endpoint.Ports {
-				compose += fmt.Sprintf("      - \"%d:%d\"\n", p.PublishedPort, p.TargetPort)
+				ports = append(ports, fmt.Sprintf("%d:%d/%s", p.PublishedPort, p.TargetPort, p.Protocol))
 			}
+			s["ports"] = ports
 		}
-		if svc.Spec.TaskTemplate.ContainerSpec.Mounts != nil {
-			compose += "    volumes:\n"
-			for _, m := range svc.Spec.TaskTemplate.ContainerSpec.Mounts {
-				compose += fmt.Sprintf("      - %s:%s\n", m.Source, m.Target)
+
+		// Volumes/mounts
+		if len(cs.Mounts) > 0 {
+			var vols []string
+			for _, m := range cs.Mounts {
+				entry := fmt.Sprintf("%s:%s", m.Source, m.Target)
+				if m.ReadOnly {
+					entry += ":ro"
+				}
+				vols = append(vols, entry)
 			}
+			s["volumes"] = vols
 		}
-		// Networks
-		if svc.Spec.TaskTemplate.Networks != nil {
-			compose += "    networks:\n"
-			networks, _ := docker.Networks()
-			for _, n := range svc.Spec.TaskTemplate.Networks {
-				for _, net := range networks {
-					if net.ID == n.Target {
-						compose += "      - " + net.Name + "\n"
-					}
+
+		// Networks with aliases
+		if len(tt.Networks) > 0 {
+			netCfg := map[string]any{}
+			for _, n := range tt.Networks {
+				name := netMap[n.Target]
+				if name == "" {
+					name = n.Target
+				}
+				name = strings.TrimPrefix(name, stackName+"_")
+				allNets[name] = true
+				if len(n.Aliases) > 0 {
+					netCfg[name] = map[string]any{"aliases": n.Aliases}
+				} else {
+					netCfg[name] = nil
 				}
 			}
+			s["networks"] = netCfg
 		}
+
+		// Configs
+		if len(cs.Configs) > 0 {
+			var cfgs []map[string]any
+			for _, c := range cs.Configs {
+				entry := map[string]any{"source": c.ConfigName}
+				if c.File != nil {
+					entry["target"] = c.File.Name
+				}
+				cfgs = append(cfgs, entry)
+			}
+			s["configs"] = cfgs
+		}
+
+		// Secrets
+		if len(cs.Secrets) > 0 {
+			var secs []map[string]any
+			for _, sec := range cs.Secrets {
+				entry := map[string]any{"source": sec.SecretName}
+				if sec.File != nil {
+					entry["target"] = sec.File.Name
+				}
+				secs = append(secs, entry)
+			}
+			s["secrets"] = secs
+		}
+
+		// Deploy section
+		deploy := map[string]any{}
+		mode := serviceMode(&svc.Spec)
+		if mode == "global" {
+			deploy["mode"] = "global"
+		} else if mode == "replicated" && svc.Spec.Mode.Replicated != nil && svc.Spec.Mode.Replicated.Replicas != nil {
+			deploy["replicas"] = *svc.Spec.Mode.Replicated.Replicas
+		}
+		if tt.Resources != nil {
+			res := map[string]any{}
+			if tt.Resources.Limits != nil {
+				lim := map[string]any{}
+				if tt.Resources.Limits.NanoCPUs > 0 {
+					lim["cpus"] = fmt.Sprintf("%.2f", float64(tt.Resources.Limits.NanoCPUs)/1e9)
+				}
+				if tt.Resources.Limits.MemoryBytes > 0 {
+					lim["memory"] = fmt.Sprintf("%dM", tt.Resources.Limits.MemoryBytes/(1024*1024))
+				}
+				if len(lim) > 0 {
+					res["limits"] = lim
+				}
+			}
+			if tt.Resources.Reservations != nil {
+				rsv := map[string]any{}
+				if tt.Resources.Reservations.NanoCPUs > 0 {
+					rsv["cpus"] = fmt.Sprintf("%.2f", float64(tt.Resources.Reservations.NanoCPUs)/1e9)
+				}
+				if tt.Resources.Reservations.MemoryBytes > 0 {
+					rsv["memory"] = fmt.Sprintf("%dM", tt.Resources.Reservations.MemoryBytes/(1024*1024))
+				}
+				if len(rsv) > 0 {
+					res["reservations"] = rsv
+				}
+			}
+			if len(res) > 0 {
+				deploy["resources"] = res
+			}
+		}
+		if tt.Placement != nil && len(tt.Placement.Constraints) > 0 {
+			deploy["placement"] = map[string]any{"constraints": tt.Placement.Constraints}
+		}
+		if svc.Spec.UpdateConfig != nil {
+			uc := map[string]any{"parallelism": svc.Spec.UpdateConfig.Parallelism}
+			if svc.Spec.UpdateConfig.Delay > 0 {
+				uc["delay"] = fmt.Sprintf("%ds", int64(svc.Spec.UpdateConfig.Delay)/1e9)
+			}
+			if svc.Spec.UpdateConfig.Order != "" {
+				uc["order"] = svc.Spec.UpdateConfig.Order
+			}
+			if svc.Spec.UpdateConfig.FailureAction != "" {
+				uc["failure_action"] = svc.Spec.UpdateConfig.FailureAction
+			}
+			deploy["update_config"] = uc
+		}
+		if svc.Spec.RollbackConfig != nil {
+			rc := map[string]any{"parallelism": svc.Spec.RollbackConfig.Parallelism}
+			if svc.Spec.RollbackConfig.Order != "" {
+				rc["order"] = svc.Spec.RollbackConfig.Order
+			}
+			deploy["rollback_config"] = rc
+		}
+		if tt.RestartPolicy != nil {
+			rp := map[string]any{}
+			if tt.RestartPolicy.Condition != "" {
+				rp["condition"] = string(tt.RestartPolicy.Condition)
+			}
+			if tt.RestartPolicy.MaxAttempts != nil && *tt.RestartPolicy.MaxAttempts > 0 {
+				rp["max_attempts"] = *tt.RestartPolicy.MaxAttempts
+			}
+			if len(rp) > 0 {
+				deploy["restart_policy"] = rp
+			}
+		}
+		// Deploy labels (non-stack)
+		dLabels := map[string]string{}
+		for k, v := range svc.Spec.Labels {
+			if !strings.HasPrefix(k, "com.docker.stack") {
+				dLabels[k] = v
+			}
+		}
+		if len(dLabels) > 0 {
+			deploy["labels"] = dLabels
+		}
+		if len(deploy) > 0 {
+			s["deploy"] = deploy
+		}
+
+		// Logging
+		if tt.LogDriver != nil && tt.LogDriver.Name != "" {
+			lg := map[string]any{"driver": tt.LogDriver.Name}
+			if len(tt.LogDriver.Options) > 0 {
+				lg["options"] = tt.LogDriver.Options
+			}
+			s["logging"] = lg
+		}
+
+		svcMap[svcName] = s
 	}
-	return compose
+	compose["services"] = svcMap
+
+	if len(allNets) > 0 {
+		netDefs := map[string]any{}
+		for n := range allNets {
+			netDefs[n] = map[string]any{"external": true}
+		}
+		compose["networks"] = netDefs
+	}
+
+	out, err := yaml.Marshal(compose)
+	if err != nil {
+		slog.Error("compose marshal failed", "err", err)
+		return ""
+	}
+	return string(out)
 }
 
 func ServiceCompose(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	svcID := resolveServiceID(id)
-	if svcID == "" { svcID = id }
+	if svcID == "" {
+		svcID = id
+	}
 	svc, err := docker.Service(svcID)
-	if err != nil { json200(w, map[string]string{"compose": ""}); return }
-
+	if err != nil {
+		json200(w, map[string]string{"compose": ""})
+		return
+	}
 	stackName := svc.Spec.Labels["com.docker.stack.namespace"]
-	svcName := svc.Spec.Name
 	if stackName != "" {
-		svcName = strings.TrimPrefix(svcName, stackName+"_")
+		json200(w, map[string]string{"compose": generateStackCompose(stackName)})
+		return
 	}
-
-	compose := "version: '3.8'\nservices:\n"
-	compose += "  " + svcName + ":\n"
-	compose += "    image: " + svc.Spec.TaskTemplate.ContainerSpec.Image + "\n"
-	if len(svc.Spec.TaskTemplate.ContainerSpec.Env) > 0 {
-		compose += "    environment:\n"
-		for _, e := range svc.Spec.TaskTemplate.ContainerSpec.Env {
-			compose += "      - " + e + "\n"
-		}
+	// Single service — generate minimal compose
+	svcName := svc.Spec.Name
+	cs := svc.Spec.TaskTemplate.ContainerSpec
+	s := map[string]any{"image": cs.Image}
+	if len(cs.Env) > 0 {
+		s["environment"] = cs.Env
 	}
-	json200(w, map[string]string{"compose": compose})
+	if len(cs.Command) > 0 {
+		s["entrypoint"] = cs.Command
+	}
+	if len(cs.Args) > 0 {
+		s["command"] = cs.Args
+	}
+	compose := map[string]any{"version": "3.8", "services": map[string]any{svcName: s}}
+	out, _ := yaml.Marshal(compose)
+	json200(w, map[string]string{"compose": string(out)})
 }
 
 // Stats returns cluster resource stats (CPU, memory, disk from node resources)
@@ -824,17 +1151,35 @@ func Placement(w http.ResponseWriter, r *http.Request) {
 
 // ── CRUD handlers (#36) ──
 
+// sanitizeImageRef strips empty or malformed digests from image references (#86)
+func sanitizeImageRef(img string) string {
+	if strings.HasSuffix(img, "@") {
+		return strings.TrimSuffix(img, "@")
+	}
+	if idx := strings.Index(img, "@"); idx >= 0 {
+		digest := img[idx+1:]
+		if digest == "" || !strings.Contains(digest, ":") {
+			return img[:idx]
+		}
+	}
+	return img
+}
+
 func ServiceCreate(w http.ResponseWriter, r *http.Request) {
 	var spec swarm.ServiceSpec
 	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
 		jsonErr(w, 400, "invalid service spec: "+err.Error())
 		return
 	}
+	if spec.TaskTemplate.ContainerSpec != nil {
+		spec.TaskTemplate.ContainerSpec.Image = sanitizeImageRef(spec.TaskTemplate.ContainerSpec.Image)
+	}
 	resp, err := docker.CreateService(spec)
 	if err != nil {
 		jsonErr(w, 500, err.Error())
 		return
 	}
+	store.RecordAudit(reqUser(r), "create", "service", spec.Name)
 	json200(w, map[string]string{"id": resp.ID})
 }
 
@@ -850,10 +1195,14 @@ func ServiceUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, 400, "invalid service spec: "+err.Error())
 		return
 	}
+	if spec.TaskTemplate.ContainerSpec != nil {
+		spec.TaskTemplate.ContainerSpec.Image = sanitizeImageRef(spec.TaskTemplate.ContainerSpec.Image)
+	}
 	if err := docker.UpdateService(id, svc.Version, spec); err != nil {
 		jsonErr(w, 500, err.Error())
 		return
 	}
+	store.RecordAudit(reqUser(r), "update", "service", spec.Name)
 	json200(w, map[string]string{"status": "updated"})
 }
 
@@ -892,7 +1241,7 @@ func StackUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func deployStack(name, spec string) (string, error) {
-	cmd := exec.Command("docker", "stack", "deploy", "-c", "-", name)
+	cmd := exec.Command("docker", "stack", "deploy", "--with-registry-auth", "-c", "-", name)
 	cmd.Stdin = strings.NewReader(spec)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -1122,9 +1471,30 @@ func StackRollback(w http.ResponseWriter, r *http.Request) {
 
 // ── #45 Registry management ──
 
+// redactRegistryCreds removes sensitive fields from registry data for API responses (#77)
+func redactRegistryCreds(reg map[string]any) map[string]any {
+	out := make(map[string]any, len(reg))
+	for k, v := range reg {
+		out[k] = v
+	}
+	if _, ok := out["password"]; ok {
+		out["password"] = "••••••"
+	}
+	if _, ok := out["token"]; ok {
+		out["token"] = "••••••"
+	}
+	if _, ok := out["secret"]; ok {
+		out["secret"] = "••••••"
+	}
+	return out
+}
+
 func RegistryList(w http.ResponseWriter, r *http.Request) {
 	regType := chi.URLParam(r, "type")
 	regs, _ := store.ListRegistries(regType)
+	for i := range regs {
+		regs[i] = redactRegistryCreds(regs[i])
+	}
 	json200(w, regs)
 }
 
@@ -1138,14 +1508,14 @@ func RegistryCreate(w http.ResponseWriter, r *http.Request) {
 	id, err := store.CreateRegistry(reg)
 	if err != nil { jsonErr(w, 500, err.Error()); return }
 	reg["id"] = id
-	json200(w, reg)
+	json200(w, redactRegistryCreds(reg))
 }
 
 func RegistryInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	reg, err := store.GetRegistry(id)
 	if err != nil { jsonErr(w, 404, "registry not found"); return }
-	json200(w, reg)
+	json200(w, redactRegistryCreds(reg))
 }
 
 func RegistryUpdate(w http.ResponseWriter, r *http.Request) {
