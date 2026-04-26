@@ -1,4 +1,50 @@
 /* swarmpit-xpx features — floating tools panel */
+/* Patch: CLJS PersistentVector/LazySeq don't have native .filter/.map/.some
+   MUI Autocomplete calls options.filter() which crashes. Add .filter to CLJS types. */
+(function(){
+  var _origIsArray = Array.isArray;
+  Array.isArray = function(a) {
+    if (_origIsArray(a)) return true;
+    // CLJS collections have cljs$core$ISeqable$ protocol marker
+    if (a && typeof a === 'object' && typeof a.cljs$lang$protocol_mask$partition0$ === 'number') return true;
+    return false;
+  };
+  // Ensure CLJS collections get .filter/.map/.some/.forEach/.reduce if missing
+  function patchProto(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (typeof obj.filter === 'function') return obj;
+    if (typeof obj.cljs$lang$protocol_mask$partition0$ === 'number') {
+      var arr = [];
+      if (typeof cljs !== 'undefined' && cljs.core && cljs.core.into_array) {
+        arr = cljs.core.into_array.call(null, obj);
+      } else if (typeof obj.length === 'number') {
+        for (var i = 0; i < obj.length; i++) arr.push(obj[i]);
+      } else if (typeof obj.forEach === 'function') {
+        obj.forEach(function(v) { arr.push(v); });
+      }
+      return arr;
+    }
+    return obj;
+  }
+  // Intercept React createElement to patch Autocomplete options prop
+  if (typeof window !== 'undefined') {
+    var _origCreateElement;
+    var _checkInterval = setInterval(function() {
+      var React = window.React || (typeof require === 'function' && require('react'));
+      if (!React || !React.createElement || _origCreateElement) return;
+      _origCreateElement = React.createElement;
+      React.createElement = function() {
+        var args = Array.prototype.slice.call(arguments);
+        if (args[1] && args[1].options && typeof args[1].options === 'object' && !_origIsArray(args[1].options)) {
+          args[1] = Object.assign({}, args[1], { options: patchProto(args[1].options) });
+        }
+        return _origCreateElement.apply(React, args);
+      };
+      clearInterval(_checkInterval);
+    }, 50);
+    setTimeout(function() { clearInterval(_checkInterval); }, 10000);
+  }
+})();
 (function () {
   'use strict';
   var TOKEN = '';
