@@ -997,12 +997,10 @@ func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 	for _, raw := range strings.Split(logs, "\n") {
 		raw = strings.TrimSpace(raw)
 		if raw == "" { continue }
-		entry := map[string]any{"line": raw}
-		// Try to parse "TIMESTAMP TASKNAME.SLOT.TASKID@NODE MESSAGE"
+		entry := map[string]any{"line": raw, "task": "", "timestamp": ""}
 		parts := strings.SplitN(raw, " ", 3)
 		if len(parts) >= 2 {
 			entry["timestamp"] = parts[0]
-			// Second part may contain task info like "serviceName.1.taskID@node"
 			taskParts := strings.SplitN(parts[1], ".", 3)
 			if len(taskParts) >= 3 {
 				atIdx := strings.Index(taskParts[2], "@")
@@ -1014,6 +1012,8 @@ func ServiceLogs(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(parts) >= 3 {
 				entry["line"] = parts[2]
+			} else {
+				entry["line"] = ""
 			}
 		}
 		entries = append(entries, entry)
