@@ -318,7 +318,10 @@ function viewAudit(p){
   api('GET','/api/audit').then(function(data){
     var el=document.getElementById('au-list');
     if(!data||!data.length){el.innerHTML='<p>No audit entries.</p>';return;}
-    el.innerHTML=table(['Timestamp','User','Action','Resource','Details'],data.map(function(r){return [r.timestamp||'-',r.user||'-',r.action||'-',r.resource||'-',r.details||'-']}));
+    el.innerHTML=table(['Timestamp','User','Action','Resource Type','Resource Name'],data.map(function(r){
+      var ts=r.timestamp?new Date(r.timestamp*1000).toLocaleString():'-';
+      return [ts,r.username||'-',r.action||'-',r.resource_type||'-',r.resource_name||'-'];
+    }));
   }).catch(function(e){document.getElementById('au-list').innerHTML='<p style="color:red">Error</p>';});
 }
 
