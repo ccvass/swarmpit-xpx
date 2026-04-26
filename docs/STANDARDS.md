@@ -4,67 +4,72 @@ Project-specific development rules for Swarmpit XPX.
 
 ## Language and Runtime
 
-- **Clojure** 1.12.0 (backend)
-- **ClojureScript** 1.11.132 (frontend)
-- **Java** 21 LTS (Eclipse Temurin)
-- **Leiningen** 2.8.2+ (build tool)
+- **Go** 1.26+ (backend)
+- **ClojureScript** 1.11.132 (legacy frontend, compiled to static JS)
+- **JavaScript** ES5 (xpx-features.js — XPX feature overlay)
+- **SQLite** (embedded database via mattn/go-sqlite3)
 
 ## Code Style
 
-- Follow standard Clojure idioms and naming conventions
-- Namespaces mirror directory structure: `swarmpit.docker.engine.client` = `src/clj/swarmpit/docker/engine/client.clj`
-- Prefer pure functions; side effects isolated to boundary namespaces
-- Use `defn-` for private functions, `def ^:private` for private vars
-- Destructuring over `get`/`get-in` when keys are known
+- Follow standard Go idioms and `go vet` rules
+- Package structure: `cmd/swarmpit/` (entry point), `internal/api/` (handlers, mappers, SSE), `internal/auth/` (JWT), `internal/store/` (SQLite), `internal/docker/` (Docker SDK wrapper)
+- Exported functions for HTTP handlers (`func ServiceList(w, r)`)
+- Unexported helpers with descriptive names (`func resolveServiceID`, `func sanitizeImageRef`)
+- Error wrapping with `fmt.Errorf("context: %w", err)`
 
 ## Formatting and Linting
 
-- **clj-kondo** for static analysis (config in `.clj-kondo/config.edn`)
-- **cljfmt** for formatting (2-space indent, align map values)
-- Run `lein check` before every commit (compile sanity gate)
+- `go vet ./...` before every commit
+- `go test ./... -race` in CI
+- `.golangci.yml` present for local linting (CI uses `go vet` due to Go 1.26 compatibility)
 
 ## Testing
 
-- Unit tests in `test/clj/` mirroring `src/clj/` structure
-- Integration tests tagged `^:integration` (require Docker)
-- Run: `lein test` (unit), `lein test :integration` (integration), `lein test :all`
+- Unit tests in `*_test.go` files alongside source
+- `internal/store/sqlite_test.go` — 20 tests, 91.8% coverage
+- `internal/auth/jwt_test.go` — 8 tests, 100% coverage
+- `internal/api/api_test.go` — 12 tests, pure logic (no Docker dependency)
+- Run: `go test ./... -race -cover`
 
-## Architecture Patterns
+## Architecture
 
-- **Embedded storage**: SQLite via next.jdbc (no external DB)
-- **In-memory stats**: Ring buffers in atoms (no external time-series DB)
-- **Docker socket**: Java 21 native NIO SocketChannel over Unix domain sockets (no JNR, no Apache HttpClient)
-- **Aggressive caching**: Docker API reads cached 5s TTL (services, nodes, networks, tasks)
-- **Circuit breakers**: `swarmpit.resilience` wraps external calls
-- **Rate limiting**: `swarmpit.ratelimit` on login endpoint
-- **SPA fallback**: Non-API routes serve index.html (no 404 on refresh)
+- **Single binary**: Go binary serves API + static frontend
+- **Embedded SQLite**: No external database; data at `$SWARMPIT_DB_PATH/swarmpit.db`
+- **In-memory stats**: Ring buffers for timeseries; agent pushes via `POST /events`
+- **Docker socket**: Docker SDK client with 15s timeout and API version negotiation
+- **SSE**: Subscription-based server-sent events with 30s refresh; authenticated
+- **SPA fallback**: Non-API routes serve `index.html`
 
 ## Frontend
 
-- **Rum** (React wrapper for ClojureScript)
-- **Material UI** v4 via cljsjs
-- Single app atom with cursors (`swarmpit.component.state`)
-- SSE for real-time events (`/events` endpoint)
+- Legacy ClojureScript SPA (compiled, served as static files)
+- `xpx-features.js` — vanilla JS overlay adding: floating Tools panel, GitOps UI, image updates, system prune, compose auto-fill, ANSI log colors, piechart fix, update order toggle
+
+## Security
+
+- JWT authentication on all API and SSE endpoints
+- Role-based access: `admin`, `user`, `viewer`
+- `WriteOnly` middleware blocks viewers from write operations
+- Registry credentials redacted in API responses (`••••••`)
+- GitOps: path traversal prevention, webhook signature validation
+- Image digest sanitization before Docker API calls
+- Backup/restore preserves password hashes
+- OAuth2/OIDC support for external authentication
+- TOTP/2FA optional per user
 
 ## Docker
 
-- Runtime image includes `curl` for HTTP healthcheck
+- `Dockerfile.xpx` — 3-stage build (ClojureScript frontend → Go binary → Alpine runtime)
+- Version injected via `--build-arg VERSION` and `-ldflags "-X main.version=..."`
 - `HEALTHCHECK` calls `/health/live` every 30s
-- Multi-arch: amd64, arm64, armv7
-- Swarmex compatibility: requires `team` label + `--limit-memory` on deploy
+- Multi-arch: amd64, arm64
+- Trivy security scanning in CI
 
-## Deployment (Swarmex clusters)
+## Deployment
 
-Services require these labels/limits for the admission controller:
-
-```bash
-docker service update \
-  --label-add team=platform \
-  --label-add swarmex.remediation.max-level=restart \
-  --limit-memory 1G \
-  --with-registry-auth \
-  tools_swarmpit
-```
+- Docker Swarm service with `--with-registry-auth`
+- Swarmex compatible: requires `team` label + `--limit-memory`
+- Stack deploys use `--with-registry-auth` automatically
 
 ## Git Conventions
 
@@ -76,15 +81,6 @@ docker service update \
 ## CI/CD
 
 - GitHub Actions (`.github/workflows/`)
-- `build.yml`: test + build on push/PR to master
-- `release.yml`: tag-triggered release + Docker push
-- Multi-arch Docker builds via QEMU + Buildx
-
-## Security Practices
-
-- No secrets in code or environment defaults
-- Rate limiting on authentication endpoints
-- Generic error messages to API consumers (details logged server-side)
-- Input sanitization on all shell-executed values
-- Non-root container execution
-- Circuit breakers prevent cascading failures
+- `build.yml`: compile check on push/PR
+- `release.yml`: tag-triggered — Go vet, test, multi-arch Docker build, Trivy scan, GitHub release
+- Legacy Clojure job runs with `continue-on-error: true`

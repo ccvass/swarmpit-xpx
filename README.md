@@ -20,36 +20,41 @@ A fork of [Swarmpit](https://github.com/swarmpit/swarmpit) with a Go backend rep
 
 - Dashboard with CPU/RAM/disk gauges and timeseries charts
 - Services — list, detail, create, edit, stop, redeploy, rollback
-- Stacks — list, detail, deploy from compose, redeploy, rollback, activate/deactivate
+- Stacks — list with timestamps, detail, deploy from compose, redeploy, rollback, activate/deactivate
 - Nodes — list, detail with stats, edit labels/availability
 - Networks, Volumes, Secrets, Configs — full CRUD
 - Tasks — list, detail with per-task stats
-- Real-time updates via SSE subscription routing
-- Registry management (DockerHub, v2, ECR, ACR, GitLab)
-- User management with JWT auth
+- Real-time updates via SSE subscription routing (authenticated)
+- Registry management (DockerHub, GHCR, GitLab, ECR, generic v2)
+- User management with JWT auth and role-based access control
 - Audit log
 
 ### New in XPX
 
+- **Full compose round-trip** — stack compose generation preserves all fields: entrypoint, healthcheck, deploy config, resources, placement, update/rollback config, labels, network aliases, configs, secrets, sysctls, cap_add/drop, logging
+- **Registry auth** — `--with-registry-auth` on all stack deploys; token exchange for DockerHub, GitLab, ECR, GHCR
+- **OAuth2/SSO** — login via any OIDC provider (GitHub, GitLab, Google, Keycloak, etc.)
+- **2FA/TOTP** — optional two-factor authentication per user
+- **RBAC** — viewer/user/admin roles; viewers blocked from write operations; granular team-based stack permissions
+- **Multi-cluster** — register and switch between multiple Docker Swarm clusters
+- **GitOps** — deploy and auto-sync stacks from Git repositories with webhook support
 - **Alerting** — CPU/RAM/disk threshold alerts via webhook
 - **Service templates** — save and reuse service configurations
 - **Auto-deploy** — webhook triggers redeploy on image push (DockerHub/GHCR)
-- **Streaming logs** — real-time log streaming via SSE
+- **Streaming logs** — real-time log streaming via SSE with ANSI color rendering
+- **Bulk stack import** — deploy multiple stacks in a single API call
+- **Backup/restore** — export/import all configuration with credential preservation
+- **Built-in TLS** — optional HTTPS via environment variables
+- **Password reset CLI** — `./swarmpit reset-password <username>` command
 - **Swagger/OpenAPI** — API documentation at `/api-docs`
 - **Compose validation** — validate YAML before deploying
 - **Health check status** — per-service health aggregation
-- **Backup/restore** — export/import all configuration
 - **Dashboard pinning** — pin favorite services and nodes
 - **Per-service timeseries** — CPU/RAM charts per service
+- **Container scanning** — Trivy security scanning in CI/CD
 - **Multi-arch** — AMD64 + ARM64 Docker images
 
 ## Quick Start
-
-```bash
-docker stack deploy -c docker-compose.yml swarmpit
-```
-
-Or with Docker service:
 
 ```bash
 docker service create \
@@ -58,7 +63,7 @@ docker service create \
   --constraint 'node.role == manager' \
   --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
   --mount type=bind,src=/mnt/swarmpit,dst=/app/data \
-  ghcr.io/ccvass/swarmpit-xpx:latest
+  ghcr.io/ccvass/swarmpit-xpx:go
 ```
 
 ## Configuration
@@ -68,23 +73,64 @@ docker service create \
 | `SWARMPIT_DB_PATH` | `/app/data` | SQLite database directory |
 | `SWARMPIT_PUBLIC_DIR` | `/app/public` | Frontend static files |
 | `SWARMPIT_INSTANCE_NAME` | (none) | Custom name shown in sidebar |
+| `SWARMPIT_ADMIN_USER` | (none) | Auto-create admin on first start |
+| `SWARMPIT_ADMIN_PASSWORD` | (none) | Admin password for auto-creation |
+| `SWARMPIT_TLS_CERT` | (none) | TLS certificate path (enables HTTPS) |
+| `SWARMPIT_TLS_KEY` | (none) | TLS private key path |
+| `SWARMPIT_WEBHOOK_SECRET` | (none) | HMAC secret for GitOps webhook validation |
+| `PORT` | `8080` | HTTP listen port |
+
+### OAuth2 Configuration
+
+Set per provider (replace `{PROVIDER}` with `GITHUB`, `GITLAB`, `GOOGLE`, etc.):
+
+| Variable | Description |
+|---|---|
+| `OAUTH_{PROVIDER}_CLIENT_ID` | OAuth2 client ID |
+| `OAUTH_{PROVIDER}_CLIENT_SECRET` | OAuth2 client secret |
+| `OAUTH_{PROVIDER}_AUTH_URL` | Authorization endpoint |
+| `OAUTH_{PROVIDER}_TOKEN_URL` | Token endpoint |
+| `OAUTH_{PROVIDER}_USERINFO_URL` | User info endpoint |
+| `OAUTH_{PROVIDER}_REDIRECT_URI` | Callback URL |
+| `OAUTH_DEFAULT_ROLE` | Default role for OAuth users (`user`) |
 
 ## API Documentation
 
 Available at `/api-docs` when the service is running.
 
+## CLI Commands
+
+```bash
+# Run the server
+./swarmpit
+
+# Reset a user's password
+./swarmpit reset-password <username> [new-password]
+```
+
 ## Development
 
 ```bash
-# Build Go backend
-CGO_ENABLED=1 go build -o swarmpit ./cmd/swarmpit
+# Build
+CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=dev" -o swarmpit ./cmd/swarmpit
 
-# Build Docker image (includes ClojureScript frontend)
-docker build -f Dockerfile.go -t swarmpit-xpx .
+# Test
+go test ./... -race -cover
 
-# Run locally
-./swarmpit
+# Lint
+go vet ./...
+
+# Docker image
+docker build -f Dockerfile.xpx -t swarmpit-xpx .
 ```
+
+## Test Coverage
+
+| Package | Coverage |
+|---|---|
+| `internal/store` | 91.8% |
+| `internal/auth` | 100% |
+| `internal/api` | Pure logic tests (Docker-dependent handlers require live cluster) |
 
 ## License
 
