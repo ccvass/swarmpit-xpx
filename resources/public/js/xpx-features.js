@@ -86,7 +86,8 @@ function api(method,path,body){
   if(body)opts.body=JSON.stringify(body);
   return fetch(path,opts).then(function(r){return r.ok?r.json():r.json().then(function(e){throw e})});
 }
-function heading(t){return '<h5 style="margin:0 0 16px;font-size:1.25rem;font-weight:500">'+t+'</h5>';}
+function heading(t){return '<h5 style="margin:0 0 4px;font-size:1.25rem;font-weight:500">'+t+'</h5>';}
+function desc(t){return '<p style="margin:0 0 16px;color:#666;font-size:.85rem">'+t+'</p>';}
 function btn(id,label,color){return '<button id="'+id+'" style="padding:6px 16px;margin:4px;border:none;border-radius:4px;background:'+(color||'#1976d2')+';color:#fff;cursor:pointer;font-size:.875rem">'+label+'</button>';}
 function loading(id){return '<div id="'+id+'" style="display:none;padding:8px"><em>Loading...</em></div>';}
 function table(headers,rows){
@@ -145,7 +146,7 @@ window.addEventListener('hashchange',renderPage);
 
 /* GitOps */
 function viewGitOps(p){
-  p.innerHTML=heading('GitOps')+btn('go-sync-all','Refresh','#1976d2')+loading('go-load')
+  p.innerHTML=heading('GitOps')+desc('Deploy stacks from Git repositories. Add a repo URL with a docker-compose file, then sync to deploy or update the stack automatically. Set a sync interval (in seconds) for auto-sync, or use 0 for manual sync only.')+btn('go-sync-all','Refresh','#1976d2')+loading('go-load')
     +'<div id="go-list"></div><hr style="margin:16px 0">'
     +'<h6>Add Repository</h6>'
     +'<input id="go-stack" placeholder="Stack Name" style="margin:4px;padding:6px">'
@@ -178,7 +179,7 @@ window._goDel=function(id){if(confirm('Delete this repo?'))api('DELETE','/api/gi
 
 /* Image Updates */
 function viewUpdates(p){
-  p.innerHTML=heading('Image Updates')+btn('upd-check','Check Now','#1976d2')+loading('upd-load')+'<div id="upd-list"></div>';
+  p.innerHTML=heading('Image Updates')+desc('Check if any running service has a newer image available in its registry. Click <b>Check Now</b> to scan all services. Requires registries to be configured under <a href="#/registries">Registries</a>.')+btn('upd-check','Check Now','#1976d2')+loading('upd-load')+'<div id="upd-list"></div>';
   p.querySelector('#upd-check').onclick=function(){
     document.getElementById('upd-load').style.display='block';
     api('POST','/api/services/check-updates').then(function(){
@@ -194,7 +195,7 @@ function viewUpdates(p){
 
 /* System Prune */
 function viewPrune(p){
-  p.innerHTML=heading('System Prune')
+  p.innerHTML=heading('System Prune')+desc('Remove unused Docker resources to free disk space. Select which resource types to clean, then use <b>Preview</b> to see what would be removed, or <b>Prune Now</b> to execute. Volumes are unchecked by default to prevent data loss.')
     +'<label><input type="checkbox" id="pr-img" checked> Images</label> '
     +'<label><input type="checkbox" id="pr-vol"> Volumes</label> '
     +'<label><input type="checkbox" id="pr-net" checked> Networks</label><br><br>'
@@ -216,7 +217,7 @@ function doPrune(dry){
 
 /* S3 Backup */
 function viewBackup(p){
-  p.innerHTML=heading('S3 Backup')+btn('bk-now','Backup Now','#1976d2')+loading('bk-load')+'<div id="bk-list"></div>';
+  p.innerHTML=heading('S3 Backup')+desc('Backup and restore the Swarmpit database to/from S3-compatible storage. Configure S3 credentials via environment variables: <code>S3_BUCKET</code>, <code>S3_REGION</code>, <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code>, and optionally <code>S3_ENDPOINT</code> for non-AWS providers.')+btn('bk-now','Backup Now','#1976d2')+loading('bk-load')+'<div id="bk-list"></div>';
   loadBackups();
   p.querySelector('#bk-now').onclick=function(){
     document.getElementById('bk-load').style.display='block';
@@ -235,7 +236,7 @@ window._bkRestore=function(key){if(confirm('Restore from '+key+'?'))api('POST','
 
 /* Clusters */
 function viewClusters(p){
-  p.innerHTML=heading('Clusters')+btn('cl-refresh','Refresh','#1976d2')+'<div id="cl-list"></div><hr style="margin:16px 0">'
+  p.innerHTML=heading('Clusters')+desc('Manage multiple Docker Swarm clusters from a single interface. Add remote clusters by providing their API endpoint URL. Use <b>Activate</b> to switch the active cluster context. Only one cluster can be active at a time.')+btn('cl-refresh','Refresh','#1976d2')+'<div id="cl-list"></div><hr style="margin:16px 0">'
     +'<h6>Add Cluster</h6>'
     +'<input id="cl-name" placeholder="Name" style="margin:4px;padding:6px">'
     +'<input id="cl-url" placeholder="URL" style="margin:4px;padding:6px;width:300px">'
@@ -260,7 +261,7 @@ window._clDel=function(id){if(confirm('Delete cluster?'))api('DELETE','/api/clus
 
 /* Teams */
 function viewTeams(p){
-  p.innerHTML=heading('Teams')+btn('tm-refresh','Refresh','#1976d2')+'<div id="tm-list"></div><hr style="margin:16px 0">'
+  p.innerHTML=heading('Teams')+desc('Role-based access control (RBAC) via team permissions. Create teams and assign stack-level permissions to control which users can manage which stacks. Users are assigned to teams through the <a href="#/users">Users</a> management page.')+btn('tm-refresh','Refresh','#1976d2')+'<div id="tm-list"></div><hr style="margin:16px 0">'
     +'<h6>Create Team</h6>'
     +'<input id="tm-name" placeholder="Team Name" style="margin:4px;padding:6px">'
     +btn('tm-create','Create','#4caf50');
@@ -282,7 +283,7 @@ window._tmDel=function(id){if(confirm('Delete team?'))api('DELETE','/api/teams/'
 
 /* Alerts */
 function viewAlerts(p){
-  p.innerHTML=heading('Alerts')+btn('al-refresh','Refresh','#1976d2')+btn('al-history','History','#ff9800')
+  p.innerHTML=heading('Alerts')+desc('Configure alert rules to monitor service health and resource usage. Rules trigger notifications when conditions are met (e.g., service down, high CPU/memory). View alert history to see past triggered events.')+btn('al-refresh','Refresh','#1976d2')+btn('al-history','History','#ff9800')
     +'<div id="al-list"></div><div id="al-hist" style="display:none"></div><hr style="margin:16px 0">'
     +'<h6>Create Rule</h6>'
     +'<input id="al-name" placeholder="Rule Name" style="margin:4px;padding:6px">'
@@ -314,7 +315,7 @@ window._alDel=function(id){if(confirm('Delete rule?'))api('DELETE','/api/alerts/
 
 /* Audit Log */
 function viewAudit(p){
-  p.innerHTML=heading('Audit Log')+'<div id="au-list"><em>Loading...</em></div>';
+  p.innerHTML=heading('Audit Log')+desc('View a chronological record of all actions performed in the system. Tracks user operations including service deployments, configuration changes, prune operations, and backup/restore events.')+'<div id="au-list"><em>Loading...</em></div>';
   api('GET','/api/audit').then(function(data){
     var el=document.getElementById('au-list');
     if(!data||!data.length){el.innerHTML='<p>No audit entries.</p>';return;}
