@@ -70,127 +70,121 @@
     return fetch(path, opts).then(function (r) { return r.json(); });
   }
 
-  /* ── Floating button + panel ── */
-  function createToolsButton() {
-    if (document.getElementById('xpx-tools-btn')) return;
+  /* ── Sidebar items ── */
+  var ITEMS = [
+    { name: 'GitOps', hash: '/xpx/gitops' },
+    { name: 'Image Updates', hash: '/xpx/updates' },
+    { name: 'System Prune', hash: '/xpx/prune' }
+  ];
 
-    // Floating button
-    var btn = document.createElement('div');
-    btn.id = 'xpx-tools-btn';
-    btn.textContent = 'Tools';
-    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:#1976d2;color:#fff;padding:10px 20px;border-radius:24px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,0.3);user-select:none;';
-    btn.onclick = togglePanel;
-    document.body.appendChild(btn);
-  }
-
-  function togglePanel() {
-    var panel = document.getElementById('xpx-tools-panel');
-    if (panel) { panel.remove(); return; }
-
-    panel = document.createElement('div');
-    panel.id = 'xpx-tools-panel';
-    panel.style.cssText = 'position:fixed;bottom:70px;right:20px;z-index:9998;background:#fff;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.25);width:600px;max-height:70vh;overflow:auto;padding:20px;font-family:Roboto,sans-serif;';
-
-    // Tabs
-    var tabs = document.createElement('div');
-    tabs.style.cssText = 'display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #eee;padding-bottom:8px;';
-    var pages = ['GitOps', 'Image Updates', 'System Prune'];
-    pages.forEach(function (name) {
-      var tab = document.createElement('button');
-      tab.textContent = name;
-      tab.dataset.tab = name;
-      tab.style.cssText = 'padding:6px 16px;border:none;background:none;cursor:pointer;font-size:14px;color:#666;border-bottom:2px solid transparent;margin-bottom:-10px;';
-      tab.onclick = function () {
-        tabs.querySelectorAll('button').forEach(function (b) { b.style.color = '#666'; b.style.borderBottomColor = 'transparent'; });
-        tab.style.color = '#1976d2';
-        tab.style.borderBottomColor = '#1976d2';
-        renderTab(name, content);
-      };
-      tabs.appendChild(tab);
+  function injectSidebar() {
+    var nav = document.querySelector('nav');
+    if (!nav || document.getElementById('xpx-sidebar')) return;
+    var sep = nav.querySelector('hr');
+    if (!sep) return;
+    var container = sep.parentNode;
+    var wrapper = document.createElement('div');
+    wrapper.id = 'xpx-sidebar';
+    var label = document.createElement('li');
+    label.style.cssText = 'list-style:none;padding:12px 16px 4px;color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:500;';
+    label.textContent = 'Tools';
+    wrapper.appendChild(label);
+    ITEMS.forEach(function (item) {
+      var a = document.createElement('a');
+      a.href = '#' + item.hash;
+      a.style.cssText = 'display:flex;align-items:center;padding:8px 16px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;cursor:pointer;transition:all 0.15s;';
+      a.textContent = item.name;
+      a.onmouseenter = function () { a.style.color = '#fff'; a.style.background = 'rgba(255,255,255,0.08)'; };
+      a.onmouseleave = function () { a.style.color = 'rgba(255,255,255,0.7)'; a.style.background = 'none'; };
+      a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
+      wrapper.appendChild(a);
     });
-    panel.appendChild(tabs);
-
-    var content = document.createElement('div');
-    content.id = 'xpx-tab-content';
-    panel.appendChild(content);
-
-    document.body.appendChild(panel);
-
-    // Activate first tab
-    tabs.querySelector('button').click();
+    container.insertBefore(wrapper, sep);
   }
 
-  function renderTab(name, container) {
-    container.innerHTML = '';
-    if (name === 'GitOps') renderGitOps(container);
-    else if (name === 'Image Updates') renderUpdates(container);
-    else if (name === 'System Prune') renderPrune(container);
+  /* ── Page rendering in main area ── */
+  function renderPage() {
+    var hash = window.location.hash;
+    if (hash.indexOf('/xpx/') === -1) { removePage(); return; }
+    var main = document.querySelector('main');
+    if (!main) return;
+    var page = document.getElementById('xpx-page');
+    if (!page) {
+      page = document.createElement('div');
+      page.id = 'xpx-page';
+      page.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:#fafafa;z-index:100;padding:24px 32px;overflow:auto;font-family:Roboto,sans-serif;';
+      main.style.position = 'relative';
+      main.appendChild(page);
+    }
+    page.innerHTML = '';
+    if (hash.indexOf('gitops') > -1) renderGitOps(page);
+    else if (hash.indexOf('updates') > -1) renderUpdates(page);
+    else if (hash.indexOf('prune') > -1) renderPrune(page);
+  }
+
+  function removePage() {
+    var p = document.getElementById('xpx-page');
+    if (p) p.remove();
+  }
+
+  function heading(text) {
+    return '<h5 style="margin:0 0 20px;font-weight:500;font-size:20px;color:#333">' + text + '</h5>';
+  }
+  function btn(id, label, color) {
+    return '<button id="' + id + '" style="padding:8px 20px;background:' + (color || '#1976d2') + ';color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:500;margin-right:8px;transition:opacity 0.15s;" onmouseenter="this.style.opacity=0.85" onmouseleave="this.style.opacity=1">' + label + '</button>';
   }
 
   /* ── GitOps ── */
   function renderGitOps(el) {
-    el.innerHTML = '<div id="xpx-gitops-list" style="color:#666">Loading...</div><button id="xpx-gitops-create" style="margin-top:12px;padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Create GitOps Stack</button>';
+    el.innerHTML = heading('GitOps Stacks') + '<div id="xpx-gitops-list" style="color:#666">Loading...</div><div style="margin-top:16px">' + btn('xpx-gitops-create', 'Create GitOps Stack') + '</div>';
     loadGitOps();
     document.getElementById('xpx-gitops-create').onclick = function () { showGitOpsForm(el); };
   }
-
   function loadGitOps() {
     api('GET', '/api/gitops').then(function (data) {
       var el = document.getElementById('xpx-gitops-list');
       if (!el) return;
-      if (!data || data.length === 0) { el.innerHTML = '<p style="color:#999;margin:0">No GitOps stacks configured.</p>'; return; }
-      var html = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #eee"><th style="padding:6px">Stack</th><th style="padding:6px">Repo</th><th style="padding:6px">Branch</th><th style="padding:6px">Status</th><th style="padding:6px">Actions</th></tr></thead><tbody>';
+      if (!data || data.length === 0) { el.innerHTML = '<p style="color:#999">No GitOps stacks configured yet.</p>'; return; }
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="text-align:left;border-bottom:2px solid #e0e0e0"><th style="padding:10px 12px">Stack</th><th style="padding:10px 12px">Repository</th><th style="padding:10px 12px">Branch</th><th style="padding:10px 12px">Status</th><th style="padding:10px 12px">Last Sync</th><th style="padding:10px 12px">Actions</th></tr></thead><tbody>';
       data.forEach(function (gs) {
-        var status = gs.lastError ? '<span style="color:#f44336">Error</span>' : gs.lastHash ? '<span style="color:#4caf50">OK</span>' : '<span style="color:#999">Pending</span>';
-        html += '<tr style="border-bottom:1px solid #f5f5f5"><td style="padding:6px">' + gs.stackName + '</td><td style="padding:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + gs.repoUrl + '</td><td style="padding:6px">' + gs.branch + '</td><td style="padding:6px">' + status + '</td><td style="padding:6px"><button data-sync="' + gs.id + '" style="padding:3px 10px;background:#1976d2;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-right:4px;font-size:12px">Sync</button><button data-delete="' + gs.id + '" style="padding:3px 10px;background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px">Del</button></td></tr>';
+        var status = gs.lastError ? '<span style="color:#d32f2f;font-weight:500">Error</span>' : gs.lastHash ? '<span style="color:#2e7d32;font-weight:500">OK</span>' : '<span style="color:#999">Pending</span>';
+        html += '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:10px 12px;font-weight:500">' + gs.stackName + '</td><td style="padding:10px 12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666">' + gs.repoUrl + '</td><td style="padding:10px 12px">' + gs.branch + '</td><td style="padding:10px 12px">' + status + '</td><td style="padding:10px 12px;color:#666;font-size:13px">' + (gs.lastSync || '-') + '</td><td style="padding:10px 12px">' + btn('', 'Sync', '#1976d2').replace('id=""', 'data-sync="' + gs.id + '"') + btn('', 'Delete', '#d32f2f').replace('id=""', 'data-delete="' + gs.id + '"') + '</td></tr>';
       });
-      html += '</tbody></table>';
-      el.innerHTML = html;
-      el.querySelectorAll('[data-sync]').forEach(function (btn) {
-        btn.onclick = function () { api('POST', '/api/gitops/' + btn.dataset.sync + '/sync').then(loadGitOps); };
-      });
-      el.querySelectorAll('[data-delete]').forEach(function (btn) {
-        btn.onclick = function () { if (confirm('Delete this GitOps stack?')) api('DELETE', '/api/gitops/' + btn.dataset.delete).then(loadGitOps); };
-      });
+      el.innerHTML = html + '</tbody></table>';
+      el.querySelectorAll('[data-sync]').forEach(function (b) { b.onclick = function () { api('POST', '/api/gitops/' + b.dataset.sync + '/sync').then(loadGitOps); }; });
+      el.querySelectorAll('[data-delete]').forEach(function (b) { b.onclick = function () { if (confirm('Delete this GitOps stack?')) api('DELETE', '/api/gitops/' + b.dataset.delete).then(loadGitOps); }; });
     });
   }
-
   function showGitOpsForm(parent) {
     if (document.getElementById('xpx-gitops-form')) return;
-    var form = document.createElement('div');
-    form.id = 'xpx-gitops-form';
-    form.style.cssText = 'margin-top:12px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:4px;';
-    form.innerHTML = '<div style="font-weight:600;margin-bottom:8px">New GitOps Stack</div>' +
-      '<input id="xf-name" placeholder="Stack Name" style="width:100%;padding:6px;margin-bottom:6px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
-      '<input id="xf-repo" placeholder="Repository URL" style="width:100%;padding:6px;margin-bottom:6px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
-      '<div style="display:flex;gap:6px;margin-bottom:6px"><input id="xf-branch" value="main" placeholder="Branch" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:3px"><input id="xf-path" value="docker-compose.yml" placeholder="Compose path" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:3px"></div>' +
-      '<input id="xf-interval" type="number" value="0" placeholder="Sync interval (sec)" style="width:100%;padding:6px;margin-bottom:8px;box-sizing:border-box;border:1px solid #ddd;border-radius:3px">' +
-      '<button id="xf-submit" style="padding:6px 16px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-right:6px;font-size:13px">Create</button>' +
-      '<button id="xf-cancel" style="padding:6px 16px;background:#999;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Cancel</button>';
-    parent.appendChild(form);
-    document.getElementById('xf-cancel').onclick = function () { form.remove(); };
+    var f = document.createElement('div');
+    f.id = 'xpx-gitops-form';
+    f.style.cssText = 'margin-top:16px;padding:20px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;max-width:520px;';
+    var inp = 'style="width:100%;padding:10px;margin-bottom:10px;box-sizing:border-box;border:1px solid #ddd;border-radius:4px;font-size:14px"';
+    f.innerHTML = '<div style="font-weight:500;font-size:16px;margin-bottom:16px">New GitOps Stack</div>' +
+      '<input id="xf-name" placeholder="Stack Name" ' + inp + '>' +
+      '<input id="xf-repo" placeholder="Repository URL" ' + inp + '>' +
+      '<div style="display:flex;gap:10px;margin-bottom:10px"><input id="xf-branch" value="main" placeholder="Branch" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px"><input id="xf-path" value="docker-compose.yml" placeholder="Compose path" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px"></div>' +
+      '<input id="xf-interval" type="number" value="0" placeholder="Sync interval (seconds, 0=manual)" ' + inp + '>' +
+      btn('xf-submit', 'Create', '#2e7d32') + btn('xf-cancel', 'Cancel', '#757575');
+    parent.appendChild(f);
+    document.getElementById('xf-cancel').onclick = function () { f.remove(); };
     document.getElementById('xf-submit').onclick = function () {
-      api('POST', '/api/gitops', {
-        stackName: document.getElementById('xf-name').value,
-        repoUrl: document.getElementById('xf-repo').value,
-        branch: document.getElementById('xf-branch').value,
-        composePath: document.getElementById('xf-path').value,
-        syncInterval: parseInt(document.getElementById('xf-interval').value) || 0,
-      }).then(function () { form.remove(); loadGitOps(); });
+      api('POST', '/api/gitops', { stackName: document.getElementById('xf-name').value, repoUrl: document.getElementById('xf-repo').value, branch: document.getElementById('xf-branch').value, composePath: document.getElementById('xf-path').value, syncInterval: parseInt(document.getElementById('xf-interval').value) || 0 }).then(function () { f.remove(); loadGitOps(); });
     };
   }
 
   /* ── Image Updates ── */
   function renderUpdates(el) {
-    el.innerHTML = '<button id="xpx-check-btn" style="padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Check Now</button><div id="xpx-updates-result" style="margin-top:12px"></div>';
+    el.innerHTML = heading('Image Updates') + '<p style="color:#666;margin:0 0 16px;font-size:14px">Check if any running service has a newer image available in its registry.</p>' + btn('xpx-check-btn', 'Check Now') + '<div id="xpx-updates-result" style="margin-top:20px"></div>';
     document.getElementById('xpx-check-btn').onclick = function () {
-      var btn = this; btn.disabled = true; btn.textContent = 'Checking...';
+      var b = this; b.disabled = true; b.textContent = 'Checking...';
       api('POST', '/api/services/check-updates').then(function (data) {
-        btn.disabled = false; btn.textContent = 'Check Now';
+        b.disabled = false; b.textContent = 'Check Now';
         var r = document.getElementById('xpx-updates-result');
-        if (!data || data.length === 0) { r.innerHTML = '<p style="color:#4caf50;margin:0">All images are up to date.</p>'; return; }
-        var html = '<p style="color:#ff9800;margin:0 0 8px">' + data.length + ' update(s) available:</p><ul style="margin:0;padding-left:20px">';
-        data.forEach(function (u) { html += '<li style="margin:2px 0;font-size:13px">' + u.serviceName + '</li>'; });
+        if (!data || data.length === 0) { r.innerHTML = '<div style="padding:16px;background:#e8f5e9;border-radius:8px;color:#2e7d32;font-weight:500">All images are up to date.</div>'; return; }
+        var html = '<div style="padding:16px;background:#fff3e0;border-radius:8px;margin-bottom:12px;color:#e65100;font-weight:500">' + data.length + ' update(s) available</div><ul style="margin:0;padding-left:20px">';
+        data.forEach(function (u) { html += '<li style="margin:6px 0;font-size:14px"><strong>' + u.serviceName + '</strong> <span style="color:#666">→ newer image available</span></li>'; });
         r.innerHTML = html + '</ul>';
       });
     };
@@ -198,107 +192,34 @@
 
   /* ── System Prune ── */
   function renderPrune(el) {
-    el.innerHTML = '<p style="color:#666;margin:0 0 12px;font-size:13px">Remove unused Docker resources (dangling images, orphan volumes, unused networks).</p><button id="xpx-preview-btn" style="padding:6px 16px;background:#1976d2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-right:6px">Preview</button><button id="xpx-prune-btn" style="padding:6px 16px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Prune Now</button><div id="xpx-prune-result" style="margin-top:12px"></div>';
+    el.innerHTML = heading('System Prune') + '<p style="color:#666;margin:0 0 16px;font-size:14px">Remove unused Docker resources: dangling images, orphan volumes, unused networks.</p>' + btn('xpx-preview-btn', 'Preview') + btn('xpx-prune-btn', 'Prune Now', '#d32f2f') + '<div id="xpx-prune-result" style="margin-top:20px"></div>';
     document.getElementById('xpx-preview-btn').onclick = function () { doPrune(true); };
-    document.getElementById('xpx-prune-btn').onclick = function () { if (confirm('Remove all unused resources?')) doPrune(false); };
+    document.getElementById('xpx-prune-btn').onclick = function () { if (confirm('Remove all unused resources? This cannot be undone.')) doPrune(false); };
   }
-
   function doPrune(dryRun) {
     api('POST', '/api/system/prune', { images: true, volumes: true, networks: true, dryRun: dryRun }).then(function (r) {
       var el = document.getElementById('xpx-prune-result');
       if (!el) return;
-      var label = dryRun ? 'Preview (no changes)' : 'Cleanup completed';
-      var color = dryRun ? '#1976d2' : '#4caf50';
-      el.innerHTML = '<p style="color:' + color + ';font-weight:500;margin:0 0 4px">' + label + '</p>' +
-        '<ul style="margin:0;padding-left:20px;font-size:13px">' +
-        '<li>Images: ' + (r.images ? r.images.count : 0) + ' (' + (r.images ? (r.images.spaceReclaimed / 1e9).toFixed(1) : 0) + ' GB)</li>' +
-        '<li>Volumes: ' + (r.volumes ? r.volumes.count : 0) + '</li>' +
-        '<li>Networks: ' + (r.networks ? r.networks.count : 0) + '</li></ul>';
+      var bg = dryRun ? '#e3f2fd' : '#e8f5e9';
+      var color = dryRun ? '#1565c0' : '#2e7d32';
+      var label = dryRun ? 'Preview — no changes made' : 'Cleanup completed';
+      el.innerHTML = '<div style="padding:16px;background:' + bg + ';border-radius:8px;color:' + color + ';font-weight:500;margin-bottom:12px">' + label + '</div>' +
+        '<div style="padding:16px;background:#fff;border:1px solid #e0e0e0;border-radius:8px"><table style="font-size:14px"><tr><td style="padding:4px 16px 4px 0;font-weight:500">Images</td><td>' + (r.images ? r.images.count : 0) + ' <span style="color:#666">(' + (r.images ? (r.images.spaceReclaimed / 1e9).toFixed(1) : 0) + ' GB)</span></td></tr><tr><td style="padding:4px 16px 4px 0;font-weight:500">Volumes</td><td>' + (r.volumes ? r.volumes.count : 0) + '</td></tr><tr><td style="padding:4px 16px 4px 0;font-weight:500">Networks</td><td>' + (r.networks ? r.networks.count : 0) + '</td></tr></table></div>';
     });
   }
 
-  /* ── Stack compose editor auto-fill ── */
-  function initComposeAutoFill() {
-    var hash = window.location.hash;
-    if (hash.indexOf('/stacks/') === -1 || hash.indexOf('/compose') === -1) return;
-    var m = hash.match(/\/stacks\/([^/]+)/);
-    if (!m) return;
-    var stackName = m[1];
-    var attempts = 0;
-    var iv = setInterval(function () {
-      if (++attempts > 15) { clearInterval(iv); return; }
-      var el = document.querySelector('.CodeMirror');
-      if (!el || !el.CodeMirror) return;
-      var cm = el.CodeMirror;
-      if (cm.getValue().trim()) { clearInterval(iv); return; }
-      clearInterval(iv);
-      api('GET', '/api/stacks/' + stackName + '/compose').then(function (data) {
-        if (data && data.compose && !cm.getValue().trim()) cm.setValue(data.compose);
-      });
-    }, 2000);
-  }
-
-  /* ── Init: wait for login then show button ── */
+  /* ── Init ── */
+  window.addEventListener('hashchange', function () { setTimeout(function () { injectSidebar(); renderPage(); }, 300); });
   var initInterval = setInterval(function () {
     getToken();
-    if (TOKEN) { createToolsButton(); clearInterval(initInterval); initComposeAutoFill(); initAnsiLogs(); fixPiechart(); initUpdateOrderToggle(); }
-  }, 1000);
-  window.addEventListener('hashchange', function () { getToken(); if (TOKEN) { initComposeAutoFill(); initAnsiLogs(); fixPiechart(); initUpdateOrderToggle(); } });
-
-  /* #91: ANSI color rendering in log viewer */
-  var ANSI_COLORS = {'30':'#000','31':'#e53935','32':'#43a047','33':'#fb8c00','34':'#1e88e5','35':'#8e24aa','36':'#00acc1','37':'#eee','90':'#757575','91':'#ef5350','92':'#66bb6a','93':'#ffa726','94':'#42a5f5','95':'#ab47bc','96':'#26c6da','97':'#fff'};
-  function ansiToHTML(text) {
-    return text.replace(/\x1b\[([0-9;]+)m/g, function(_, codes) {
-      var parts = codes.split(';');
-      for (var i = 0; i < parts.length; i++) {
-        if (ANSI_COLORS[parts[i]]) return '<span style="color:' + ANSI_COLORS[parts[i]] + '">';
-        if (parts[i] === '0' || parts[i] === '') return '</span>';
-        if (parts[i] === '1') return '<span style="font-weight:bold">';
-      }
-      return '';
-    });
-  }
-  function initAnsiLogs() {
-    var observer = new MutationObserver(function(mutations) {
-      mutations.forEach(function(m) {
-        m.addedNodes.forEach(function(node) {
-          if (node.nodeType === 1 && node.classList && node.classList.contains('log-content')) {
-            var raw = node.textContent;
-            if (raw.indexOf('\x1b[') !== -1) {
-              node.innerHTML = ansiToHTML(raw.replace(/</g,'&lt;').replace(/>/g,'&gt;'));
-            }
-          }
-        });
-      });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  /* #95: Fix piechart SVG with high replica counts */
-  function fixPiechart() {
-    var style = document.getElementById('xpx-piechart-fix');
-    if (style) return;
-    style = document.createElement('style');
-    style.id = 'xpx-piechart-fix';
-    style.textContent = '.piechart-container svg { max-width: 100%; height: auto; overflow: visible; } .piechart-container svg circle { vector-effect: non-scaling-stroke; }';
-    document.head.appendChild(style);
-  }
-
-  /* #96: Update order toggle on service edit */
-  function initUpdateOrderToggle() {
-    if (window.location.hash.indexOf('/edit') === -1) return;
-    var attempts = 0;
-    var iv = setInterval(function() {
-      if (++attempts > 20) { clearInterval(iv); return; }
-      var form = document.querySelector('[class*="deployment"]') || document.querySelector('[class*="update-config"]');
-      if (!form) return;
-      if (document.getElementById('xpx-update-order')) { clearInterval(iv); return; }
-      clearInterval(iv);
-      var toggle = document.createElement('div');
-      toggle.id = 'xpx-update-order';
-      toggle.style.cssText = 'margin:8px 0;padding:8px;background:#f5f5f5;border-radius:4px;font-size:13px;';
-      toggle.innerHTML = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="xpx-start-first"> <span>Start new tasks before stopping old (start-first)</span></label>';
-      form.parentNode.insertBefore(toggle, form.nextSibling);
-    }, 500);
-  }
+    if (!TOKEN) return;
+    var nav = document.querySelector('nav');
+    if (!nav || !nav.querySelector('hr')) return;
+    injectSidebar();
+    renderPage();
+    // MutationObserver to re-inject when ClojureScript re-renders nav
+    var observer = new MutationObserver(function () { if (!document.getElementById('xpx-sidebar')) injectSidebar(); });
+    observer.observe(nav, { childList: true, subtree: true });
+    clearInterval(initInterval);
+  }, 500);
 })();
