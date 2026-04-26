@@ -98,9 +98,9 @@
       var a = document.createElement('a');
       a.href = '#' + item.hash;
       a.className = 'MuiButtonBase-root MuiListItem-root MuiListItem-gutters MuiListItem-button';
-      a.style.cssText = 'display:flex;align-items:center;padding:4px 16px;color:rgba(255,255,255,0.7);text-decoration:none;font:400 14px/1.5 Roboto,sans-serif;cursor:pointer;transition:background 0.15s;width:100%;box-sizing:border-box;';
-      a.onmouseenter = function () { a.style.background = 'rgba(255,255,255,0.08)'; };
-      a.onmouseleave = function () { a.style.background = 'none'; };
+      a.style.cssText = 'display:flex;align-items:center;padding:4px 16px;color:rgba(255,255,255,0.7) !important;text-decoration:none;font:400 14px/1.5 Roboto,sans-serif;cursor:pointer;transition:background 0.15s;width:100%;box-sizing:border-box;';
+      a.onmouseenter = function () { a.style.background = 'rgba(255,255,255,0.08)'; a.style.color = '#fff'; };
+      a.onmouseleave = function () { a.style.background = 'none'; a.style.color = 'rgba(255,255,255,0.7)'; };
       a.onclick = function (e) { e.preventDefault(); window.location.hash = item.hash; renderPage(); };
       var icon = document.createElement('div');
       icon.style.cssText = 'min-width:40px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);';
@@ -108,13 +108,24 @@
       a.appendChild(icon);
       var txt = document.createElement('h6');
       txt.className = 'MuiTypography-root MuiTypography-h6';
-      txt.style.cssText = 'font-size:0.875rem;font-weight:400;line-height:1.5;color:inherit;margin:0;';
+      txt.style.cssText = 'font-size:0.875rem;font-weight:400;line-height:1.5;color:rgba(255,255,255,0.7) !important;margin:0;';
       txt.textContent = item.name;
       a.appendChild(txt);
       wrapper.appendChild(a);
     });
 
     navList.appendChild(wrapper);
+  }
+
+  function ensureToolsAtEnd() {
+    var tools = document.getElementById('xpx-tools');
+    if (!tools) return;
+    var parent = tools.parentNode;
+    if (!parent) return;
+    // If tools is not the last child, move it
+    if (parent.lastElementChild !== tools) {
+      parent.appendChild(tools);
+    }
   }
 
   /* ── Page rendering in main area ── */
@@ -230,6 +241,7 @@
     getToken();
     if (!TOKEN) return;
     injectSidebar();
+    ensureToolsAtEnd();
   }, 2000);
   // Also try immediately and on short intervals at startup
   var fastInit = setInterval(function () {
