@@ -26,8 +26,8 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${VERSION}" -o swarmp
 FROM alpine:3.21
 LABEL org.opencontainers.image.source="https://github.com/ccvass/swarmpit-xpx"
 RUN apk add --no-cache docker-cli curl ca-certificates git && \
-    addgroup -S swarmpit && adduser -S swarmpit -G swarmpit && \
-    mkdir -p /app/data && chown -R swarmpit:swarmpit /app
+    addgroup -g 999 -S docker && adduser -S swarmpit -G docker && \
+    mkdir -p /app/data && chown -R swarmpit:docker /app
 WORKDIR /app
 COPY --from=builder /app/swarmpit .
 COPY --from=frontend /app/resources/public/ /app/public/
@@ -131,5 +131,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 ENV SWARMPIT_PUBLIC_DIR=/app/public
 ENV SWARMPIT_DB_PATH=/app/data
 EXPOSE 8080
-USER swarmpit
+USER swarmpit:docker
 CMD ["./swarmpit"]
