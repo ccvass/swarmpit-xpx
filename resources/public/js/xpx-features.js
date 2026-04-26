@@ -146,7 +146,7 @@ window.addEventListener('hashchange',renderPage);
 
 /* GitOps */
 function viewGitOps(p){
-  p.innerHTML=heading('GitOps')+desc('Deploy stacks from Git repositories. Add a repo URL with a docker-compose file, then sync to deploy or update the stack automatically. Set a sync interval (in seconds) for auto-sync, or use 0 for manual sync only.')+btn('go-sync-all','Refresh','#1976d2')+loading('go-load')
+  p.innerHTML=heading('GitOps')+desc('<b>Deploy Docker Swarm stacks directly from Git repositories.</b><br><br><b>How it works:</b> Add a Git repo containing a <code>docker-compose.yml</code>, and Swarmpit will deploy/update the stack on each sync.<br><br><b>Setup:</b><br>1. Enter a <b>Stack Name</b> (used as the Swarm stack name)<br>2. Provide the <b>Repository URL</b> (e.g., <code>https://github.com/org/repo.git</code> or <code>git@github.com:org/repo.git</code>)<br>3. Set the <b>Branch</b> (default: <code>main</code>)<br>4. Set the <b>Compose Path</b> (e.g., <code>docker-compose.yml</code> or <code>deploy/stack.yml</code>)<br>5. Set <b>Sync Interval</b> in seconds (<code>300</code> = every 5 min, <code>0</code> = manual only)<br><br><b>Webhook support:</b> Trigger sync via <code>POST /api/webhooks/git/{id}</code> from your CI/CD pipeline.<br><b>Private repos:</b> Configure credentials (username/token) when creating the repository entry.')+btn('go-sync-all','Refresh','#1976d2')+loading('go-load')
     +'<div id="go-list"></div><hr style="margin:16px 0">'
     +'<h6>Add Repository</h6>'
     +'<input id="go-stack" placeholder="Stack Name" style="margin:4px;padding:6px">'
@@ -179,7 +179,7 @@ window._goDel=function(id){if(confirm('Delete this repo?'))api('DELETE','/api/gi
 
 /* Image Updates */
 function viewUpdates(p){
-  p.innerHTML=heading('Image Updates')+desc('Check if any running service has a newer image available in its registry. Click <b>Check Now</b> to scan all services. Requires registries to be configured under <a href="#/registries">Registries</a>.')+btn('upd-check','Check Now','#1976d2')+loading('upd-load')+'<div id="upd-list"></div>';
+  p.innerHTML=heading('Image Updates')+desc('<b>Scan all running services for newer image versions in their registries.</b><br><br><b>How it works:</b> Compares the image digest of each running service against the latest available in the configured registry. Services with available updates are listed with their current and available status.<br><br><b>Prerequisites:</b> Registries must be configured under <a href="#/registries">Registries</a> (Docker Hub, GHCR, private registries, etc.).<br><br><b>Results:</b><br>• <span style="color:#4caf50;font-weight:500">up-to-date</span> — service is running the latest image<br>• <span style="color:#ff9800;font-weight:500">update available</span> — a newer image exists in the registry<br><br><b>Auto-check:</b> Runs periodically in the background. Click <b>Check Now</b> to trigger an immediate scan.')+btn('upd-check','Check Now','#1976d2')+loading('upd-load')+'<div id="upd-list"></div>';
   p.querySelector('#upd-check').onclick=function(){
     document.getElementById('upd-load').style.display='block';
     api('POST','/api/services/check-updates').then(function(){
@@ -195,7 +195,7 @@ function viewUpdates(p){
 
 /* System Prune */
 function viewPrune(p){
-  p.innerHTML=heading('System Prune')+desc('Remove unused Docker resources to free disk space. Select which resource types to clean, then use <b>Preview</b> to see what would be removed, or <b>Prune Now</b> to execute. Volumes are unchecked by default to prevent data loss.')
+  p.innerHTML=heading('System Prune')+desc('<b>Remove unused Docker resources to reclaim disk space across the cluster.</b><br><br><b>What gets removed:</b><br>• <b>Images</b> — dangling and unused images not referenced by any container<br>• <b>Volumes</b> — orphan volumes not attached to any container (<b>⚠️ unchecked by default</b> to prevent data loss)<br>• <b>Networks</b> — orphan networks not used by any service<br><br><b>Usage:</b><br>1. Select resource types to clean (checkboxes above)<br>2. Click <b>Preview</b> to see what <em>would</em> be removed — this is safe and makes no changes<br>3. Click <b>Prune Now</b> to execute — <b>this is destructive and cannot be undone</b><br><br><b>Results:</b> Shows count of removed resources and space reclaimed in MB.')
     +'<label><input type="checkbox" id="pr-img" checked> Images</label> '
     +'<label><input type="checkbox" id="pr-vol"> Volumes</label> '
     +'<label><input type="checkbox" id="pr-net" checked> Networks</label><br><br>'
@@ -217,7 +217,7 @@ function doPrune(dry){
 
 /* S3 Backup */
 function viewBackup(p){
-  p.innerHTML=heading('S3 Backup')+desc('Backup and restore the Swarmpit database to/from S3-compatible storage. Configure S3 credentials via environment variables: <code>S3_BUCKET</code>, <code>S3_REGION</code>, <code>S3_ACCESS_KEY</code>, <code>S3_SECRET_KEY</code>, and optionally <code>S3_ENDPOINT</code> for non-AWS providers.')+btn('bk-now','Backup Now','#1976d2')+loading('bk-load')+'<div id="bk-list"></div>';
+  p.innerHTML=heading('S3 Backup')+desc('<b>Backup and restore the Swarmpit SQLite database to S3-compatible storage.</b><br><br><b>Required environment variables:</b><br>• <code>BACKUP_S3_ENDPOINT</code> — S3 endpoint URL (e.g., <code>https://s3.amazonaws.com</code> or <code>https://minio.example.com</code>)<br>• <code>BACKUP_S3_BUCKET</code> — bucket name (e.g., <code>swarmpit-backups</code>)<br>• <code>BACKUP_S3_REGION</code> — AWS region (e.g., <code>us-east-1</code>)<br>• <code>BACKUP_S3_ACCESS_KEY</code> — access key ID<br>• <code>BACKUP_S3_SECRET_KEY</code> — secret access key<br><br><b>Optional:</b><br>• <code>BACKUP_RETENTION_DAYS</code> — days to keep backups (default: <code>30</code>)<br><br><b>Usage:</b> Click <b>Backup Now</b> to create an immediate backup. Use <b>Restore</b> on any listed backup to restore the database to that point in time.')+btn('bk-now','Backup Now','#1976d2')+loading('bk-load')+'<div id="bk-list"></div>';
   loadBackups();
   p.querySelector('#bk-now').onclick=function(){
     document.getElementById('bk-load').style.display='block';
@@ -230,13 +230,21 @@ function loadBackups(){
     if(!data||!data.length){el.innerHTML='<p>No backups found.</p>';return;}
     el.innerHTML=table(['Key','Date','Size','Actions'],data.map(function(r){return [r.key,r.date||r.lastModified||'-',r.size||'-',
       btn('','Restore','#ff9800').replace('<button','<button onclick="window._bkRestore(\''+r.key+'\')"')]}));
-  }).catch(function(e){el.innerHTML='<p style="color:red">Error loading backups</p>';});
+  }).catch(function(e){
+    var msg=(e&&(e.message||e.error||''))||'';
+    if(msg.toLowerCase().indexOf('not configured')!==-1){
+      el.innerHTML='<p style="color:#ff9800"><b>S3 backup is not configured.</b></p><p>Set the following environment variables on the Swarmpit service:</p><pre style="background:#f5f5f5;padding:12px;border-radius:4px;font-size:.85rem">'
+        +'BACKUP_S3_ENDPOINT=https://s3.amazonaws.com\nBACKUP_S3_BUCKET=swarmpit-backups\nBACKUP_S3_REGION=us-east-1\nBACKUP_S3_ACCESS_KEY=your-access-key\nBACKUP_S3_SECRET_KEY=your-secret-key\nBACKUP_RETENTION_DAYS=30  # optional, default 30</pre>';
+    } else {
+      el.innerHTML='<p style="color:red">Error loading backups: '+(msg||'unknown error')+'</p>';
+    }
+  });
 }
 window._bkRestore=function(key){if(confirm('Restore from '+key+'?'))api('POST','/api/restore/s3',{key:key}).then(function(){alert('Restore initiated')}).catch(alert);};
 
 /* Clusters */
 function viewClusters(p){
-  p.innerHTML=heading('Clusters')+desc('Manage multiple Docker Swarm clusters from a single interface. Add remote clusters by providing their API endpoint URL. Use <b>Activate</b> to switch the active cluster context. Only one cluster can be active at a time.')+btn('cl-refresh','Refresh','#1976d2')+'<div id="cl-list"></div><hr style="margin:16px 0">'
+  p.innerHTML=heading('Clusters')+desc('<b>Manage multiple Docker Swarm clusters from a single Swarmpit instance.</b><br><br><b>How it works:</b> Add remote clusters by providing their Docker API endpoint URL. Only one cluster is active at a time — switching clusters changes the context for all operations (services, stacks, nodes).<br><br><b>Setup:</b><br>1. Ensure the remote Docker daemon exposes its API (e.g., <code>https://remote-host:2376</code>)<br>2. Configure TLS certificates if required for remote access<br>3. Click <b>Add</b> with the cluster name and URL<br>4. Click <b>Activate</b> to switch to that cluster<br><br><b>Current cluster:</b> The active cluster is shown with a green status indicator.')+btn('cl-refresh','Refresh','#1976d2')+'<div id="cl-list"></div><hr style="margin:16px 0">'
     +'<h6>Add Cluster</h6>'
     +'<input id="cl-name" placeholder="Name" style="margin:4px;padding:6px">'
     +'<input id="cl-url" placeholder="URL" style="margin:4px;padding:6px;width:300px">'
@@ -261,7 +269,7 @@ window._clDel=function(id){if(confirm('Delete cluster?'))api('DELETE','/api/clus
 
 /* Teams */
 function viewTeams(p){
-  p.innerHTML=heading('Teams')+desc('Role-based access control (RBAC) via team permissions. Create teams and assign stack-level permissions to control which users can manage which stacks. Users are assigned to teams through the <a href="#/users">Users</a> management page.')+btn('tm-refresh','Refresh','#1976d2')+'<div id="tm-list"></div><hr style="margin:16px 0">'
+  p.innerHTML=heading('Teams')+desc('<b>Role-Based Access Control (RBAC) via team-based permissions.</b><br><br><b>How it works:</b> Teams define stack-level permissions. Users assigned to a team inherit its access rights.<br><br><b>Permission model:</b><br>• Each team can be granted <b>read</b> (view) or <b>read/write</b> (manage) access per stack<br>• Users not in any team have no access to restricted stacks<br>• Admin users bypass team restrictions<br><br><b>Setup:</b><br>1. Create a team with a descriptive name (e.g., <code>backend-devs</code>)<br>2. Assign stack permissions to the team via the team detail view<br>3. Assign users to teams from the <a href="#/users">Users</a> management page<br><br><b>Tip:</b> Use teams to isolate environments (dev, staging, prod) or by project ownership.')+btn('tm-refresh','Refresh','#1976d2')+'<div id="tm-list"></div><hr style="margin:16px 0">'
     +'<h6>Create Team</h6>'
     +'<input id="tm-name" placeholder="Team Name" style="margin:4px;padding:6px">'
     +btn('tm-create','Create','#4caf50');
@@ -283,7 +291,7 @@ window._tmDel=function(id){if(confirm('Delete team?'))api('DELETE','/api/teams/'
 
 /* Alerts */
 function viewAlerts(p){
-  p.innerHTML=heading('Alerts')+desc('Configure alert rules to monitor service health and resource usage. Rules trigger notifications when conditions are met (e.g., service down, high CPU/memory). View alert history to see past triggered events.')+btn('al-refresh','Refresh','#1976d2')+btn('al-history','History','#ff9800')
+  p.innerHTML=heading('Alerts')+desc('<b>Monitor service health and resource usage with configurable alert rules.</b><br><br><b>Rule types:</b><br>• <b>Service down</b> — triggers when a service has 0 running replicas<br>• <b>CPU threshold</b> — triggers when CPU usage exceeds a percentage (e.g., <code>cpu > 80</code>)<br>• <b>Memory threshold</b> — triggers when memory usage exceeds a limit (e.g., <code>memory > 512MB</code>)<br><br><b>Setup:</b><br>1. Create a rule with a name and condition expression<br>2. Configure notification channels (webhook, email) in settings<br>3. Rules are evaluated continuously against live metrics<br><br><b>History:</b> Click <b>History</b> to view all past triggered alerts with timestamps, rule names, and details. Useful for post-incident analysis.')+btn('al-refresh','Refresh','#1976d2')+btn('al-history','History','#ff9800')
     +'<div id="al-list"></div><div id="al-hist" style="display:none"></div><hr style="margin:16px 0">'
     +'<h6>Create Rule</h6>'
     +'<input id="al-name" placeholder="Rule Name" style="margin:4px;padding:6px">'
@@ -315,7 +323,7 @@ window._alDel=function(id){if(confirm('Delete rule?'))api('DELETE','/api/alerts/
 
 /* Audit Log */
 function viewAudit(p){
-  p.innerHTML=heading('Audit Log')+desc('View a chronological record of all actions performed in the system. Tracks user operations including service deployments, configuration changes, prune operations, and backup/restore events.')+'<div id="au-list"><em>Loading...</em></div>';
+  p.innerHTML=heading('Audit Log')+desc('<b>Chronological record of all user actions performed in the system.</b><br><br><b>What gets logged:</b><br>• Service deployments and updates<br>• Stack create/update/delete operations<br>• Configuration changes (secrets, configs, networks)<br>• System prune operations<br>• Backup and restore events<br>• User login/logout and permission changes<br><br><b>Each entry includes:</b> timestamp, username, action type, resource type, and resource name.<br><br><b>Use cases:</b> Compliance auditing, debugging deployment issues, tracking who changed what and when. Entries are immutable and cannot be deleted.')+'<div id="au-list"><em>Loading...</em></div>';
   api('GET','/api/audit').then(function(data){
     var el=document.getElementById('au-list');
     if(!data||!data.length){el.innerHTML='<p>No audit entries.</p>';return;}
